@@ -1,0 +1,35 @@
+{
+  "name": "BackEnd_Node",
+  "version": "1.0.0",
+  "description": "",
+  "main": "index.js",
+  "scripts": {
+    "set:env:test": "set NODE_ENV=test",
+    "start:dev:c": "nodemon ./bin/www -w app.js -w alwapp",
+    "start:env:test": "concurrently \"npm run set:env:test\" \"npm run start:dev:c\"",
+    "start:test": "cross-env NODE_ENV=test PORT=8080 ./node_modules/.bin/nodemon ./bin/www -w app.js -w alwapp",
+    "start:dev": "cross-env NODE_ENV=development PORT=8081 ./node_modules/.bin/nodemon ./bin/www -w app.js -w alwapp --max-old-space-size=8192",
+    "test": "echo \"Error: no test specified\" && exit 1"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "body-parser": "^1.18.2",
+    "chokidar": "^2.0.3",
+    "csvtojson": "^1.1.9",
+    "express": "^4.16.2",
+    "moment": "^2.21.0",
+    "morgan": "^1.9.0",
+    "node-cron": "^1.2.1",
+    "node-watch": "^0.5.8",
+    "pg": "^7.4.1",
+    "pg-hstore": "^2.3.2",
+    "sequelize": "^4.35.2"
+  },
+  "devDependencies": {
+    "concurrently": "^3.5.1",
+    "cross-env": "^5.1.3",
+    "nodemon": "^1.17.1"
+  }
+}

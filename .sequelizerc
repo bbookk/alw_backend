@@ -1,0 +1,8 @@
+const path = require('path');
+
+module.exports = {
+  "config": path.resolve('./alwapp/config', 'config.json'),
+  "models-path": path.resolve('./alwapp/models'),
+  "seeders-path": path.resolve('./alwapp/seeders'),
+  "migrations-path": path.resolve('./alwapp/migrations')
+};
