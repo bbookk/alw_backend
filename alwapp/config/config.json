@@ -5,6 +5,7 @@
     "database": "alwsdb",
     "host": "10.138.47.138",
     "dialect": "postgres",
+    "logging": false,
     "pool": {
       "max": "5",
       "min": "0",

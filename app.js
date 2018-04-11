@@ -36,6 +36,7 @@ require('./alwapp/router')(app);
 // batchService.importSL();
 
   attendanceService.isPerfectAttenDance();
+  attendanceService.imPerfectAttenDance();
   summaryService.processSummaryDetail();
 
 // });

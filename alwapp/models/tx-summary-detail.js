@@ -2,19 +2,19 @@
 
 module.exports = (sequelize, DataTypes) => {
     const TxSummaryDetail = sequelize.define('TxSummaryDetail', {
-        summary_detail_id: {
+        summaryDetailId: {
             type: DataTypes.INTEGER,
             field: 'summary_detail_id',
             allowNull: false,
             primaryKey: true,
             autoIncrement: true
         },
-        tx_detail_sl_id: {
+        txDetailSlId: {
             type: DataTypes.INTEGER,
             field: 'tx_detail_sl_id',
             allowNull: true
         },
-        tx_detail_tr_id: {
+        txDetailTrId: {
             type: DataTypes.INTEGER,
             field: 'tx_detail_tr_id',
             allowNull: true
@@ -24,72 +24,72 @@ module.exports = (sequelize, DataTypes) => {
             field: 'pin',
             allowNull: true
         },
-        schedule_start_dt: {
+        scheduleStartDt: {
             type: DataTypes.DATE,
             field: 'schedule_start_dt',
             allowNull: true
         },
-        schedule_end_dt: {
+        scheduleEndDt: {
             type: DataTypes.DATE,
             field: 'schedule_end_dt',
             allowNull: true
         },
-        ot_start_dt: {
+        otStartDt: {
             type: DataTypes.DATE,
             field: 'ot_start_dt',
             allowNull: true
         },
-        ot_end_dt: {
+        otEndDt: {
             type: DataTypes.DATE,
             field: 'ot_end_dt',
             allowNull: true
         },
-        actual_clockin_dt: {
+        actualClockinDt: {
             type: DataTypes.DATE,
             field: 'actual_clockin_dt',
             allowNull: true
         },
-        actual_clockout_dt: {
+        actualClockoutDt: {
             type: DataTypes.DATE,
             field: 'actual_clockout_dt',
             allowNull: true
         },
-        record_type: {
+        recordType: {
             type: DataTypes.STRING(50),
             field: 'record_type',
             allowNull: true
         },
-        shift_flag: {
+        shiftFlag: {
             type: DataTypes.CHAR(1),
             field: 'shift_flag',
             allowNull: true
         },
-        transport_flag: {
+        transportFlag: {
             type: DataTypes.CHAR(1),
             field: 'transport_flag',
             allowNull: true
         },
-        ot_1_0: {
+        ot10: {
             type: DataTypes.FLOAT(53),
             field: 'ot_1_0',
             allowNull: true
         },
-        ot_1_5: {
+        ot15: {
             type: DataTypes.FLOAT(53),
             field: 'ot_1_5',
             allowNull: true
         },
-        ot_3_0: {
+        ot30: {
             type: DataTypes.FLOAT(53),
             field: 'ot_3_0',
             allowNull: true
         },
-        record_date: {
+        recordDate: {
             type: DataTypes.DATEONLY,
             field: 'record_date',
             allowNull: true
         },
-        record_month: {
+        recordMonth: {
             type: DataTypes.CHAR(6),
             field: 'record_month',
             allowNull: false
@@ -99,17 +99,17 @@ module.exports = (sequelize, DataTypes) => {
             field: 'remark',
             allowNull: true
         },
-        use_flag: {
+        useFlag: {
             type: DataTypes.CHAR(1),
             field: 'use_flag',
             allowNull: true
         },
-        create_by: {
+        createBy: {
             type: DataTypes.STRING(20),
             field: 'create_by',
             allowNull: false
         },
-        create_dt: {
+        createDt: {
             type: DataTypes.DATE,
             field: 'create_dt',
             allowNull: false
