@@ -9,7 +9,7 @@ const app = express();
 //batch
 const cron = require('node-cron');
 const fs = require('fs');
-const batchService = require('./alwapp/service/batch-service');
+// const batchService = require('./alwapp/service/batch-service');
 const summaryService = require('./alwapp/service/summary-service');
 const attendanceService = require('./alwapp/service/attendace-service');
 // Log requests to the console.
@@ -36,7 +36,7 @@ require('./alwapp/router')(app);
 // batchService.importSL();
 
   attendanceService.isPerfectAttenDance();
-  attendanceService.imPerfectAttenDance();
+  // attendanceService.imPerfectAttenDance();
   summaryService.processSummaryDetail();
 
 // });
