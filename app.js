@@ -35,9 +35,16 @@ require('./alwapp/router')(app);
 // batchService.copyFromNas();
 // batchService.importSL();
 
-  attendanceService.isPerfectAttenDance();
-  attendanceService.imPerfectAttenDance();
-  summaryService.processSummaryDetail();
+// test();
+// async function test(){
+//     let perfect = await 
+//     // console.log(perfect)
+//     let imperfect = 
+//     // console.log(imperfect)
+// }
+attendanceService.isPerfectAttenDance();
+attendanceService.imPerfectAttenDance();
+summaryService.processSummaryDetail();
 
 // });
 
