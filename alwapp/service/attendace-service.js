@@ -42,9 +42,15 @@ let mockObj = [
         pin: '0004'
     },
     {
-        pin : '0005'
+        pin: '0005'
     }
 ]
+
+let pin_result = {};
+
+let perfect_pin = [];
+let imperfect_pin = [];
+
 
 module.exports.isPerfectAttenDance = async (req, res) => {
     console.log('check perfect')
@@ -65,11 +71,14 @@ module.exports.isPerfectAttenDance = async (req, res) => {
     for (let i = 0; i < all_emp.length; i++) {
         let all = []
         all = all_emp[i];
+
         for (let j = 0; j < all.length; j++) {
             if (all[j].useFlag === leaveFlag.late) {
                 let pin = await getTooLate(all[j]);
+                // console.log(pin)
                 //array เก็บค่า employee ที่ไม่เคยมาสาย
                 result = await spliceArray(all_emp, pin);
+
             }
         }
     }
@@ -84,49 +93,77 @@ module.exports.isPerfectAttenDance = async (req, res) => {
     for (let i = 0; i < emp_not_late.length; i++) {
         let arr = [];
         arr = emp_not_late[i];
+        let countVL = 0; //ตัวนับวันลาพักร้อน
+        let countOFF = 0; //ตัวนับวันลาพักร้อน + วันหยุด
         for (let j = 0; j < arr.length; j++) {
             let emp_usedLeave = await getQuotaLeave(arr[j]);
             for (let k = 0; k < emp_usedLeave.length; k++) {
                 let use = emp_usedLeave[k].used;
-                //check วันลาทุกอย่างว่าเกิน 5 วัน / เดือน ?
-                if (arr[j].recordType === recordType.leaveType.SL || arr[j].recordType === recordType.leaveType.VL ||
-                    arr[j].recordType === recordType.leaveType.BL || arr[j].recordType === recordType.leaveType.BD) {
-                    if (use <= 5) {
-                        let date = await getDate(arr[j].scheduleStartDt);
+                //ลาน้อยกว่า 5 วันต่อเดือน
+                if (use <= 5) {
+                    //check วันลาทุกอย่างว่าเกิน 5 วัน / เดือน ?
+                    if (arr[j].recordType === recordType.leaveType.SL || arr[j].recordType === recordType.leaveType.VL ||
+                        arr[j].recordType === recordType.leaveType.BL || arr[j].recordType === recordType.leaveType.BD) {
                         //check ว่าลาพักร้อนติดกัน 3 วันมั้ย
-                        if(arr[j].recordType === recordType.leaveType.VL){
-                          
+                        if (arr[j].recordType === recordType.leaveType.VL) {
+                            let date1 = arr[j].scheduleStartDt;
+                            let date2 = arr[j].scheduleEndDt;
+                            let diff = convertMS(calVacation(date1, date2)); //คนวณหาค่าว่าวันที่ลาห่งกัน 1 วันรึป่าว
+                            if (diff === 1) {
+                                countVL++; //เอามาไว้นับวันลาพักร้อน
+                            }
                         }
-                        //check ว่าล่า BD แล้วมี SL BL ?
-                        if (arr[j].recordType === recordType.leaveType.BD) {
-                            let emp = await getEmployee(emp_usedLeave[k]);
-                            
-                            for(let x = 0; x < emp.length; x++){
-                                if (emp[x].recordType === recordType.leaveType.SL || emp[x].recordType === recordType.leaveType.BL) {
-                                    // console.log('go to cal in imperfect')
-                                    //check time
-                                    let start = getTime(emp[x].scheduleStartDt);
-                                    let end = getTime(emp[x].scheduleEndDt);
-                                    //calculate time 
-                                    let result = (end - start) - 1;
-                                    if (result <= 8) {
-                                        // console.log(emp_usedLeave[k].pin + ' : imperfect paid 500')
+
+                        //check ว่าลาพักร้อน + วันหยุด <=5 มั้ย
+                        if (arr[j].recordType === recordType.leaveType.VL || arr[j].recordType === recordType.leaveType.OFF
+                            || arr[j].recordType === recordType.leaveType.BD) {
+                            countOFF++;
+                        }
+
+                        //กรณีลาพักร้อนติดกันไม่เกิน 3 วัน และลาพักร้อน + วันหยุดรวมกันไม่เกิน 5 วัน
+                        if (countVL <= 3 && countOFF <= 5) {
+                            //check ว่าล่า BD แล้วมี SL BL ?
+                            if (arr[j].recordType === recordType.leaveType.BD) {
+                                let emp = await getEmployee(emp_usedLeave[k]);
+                                cal_hours(emp, arr[j].pin);
+                            }
+                            if (arr[j].recordType === recordType.leaveType.VL) {
+                                if (countVL <= 3) {
+                                    // console.log(arr[j].pin + ' : perfect paid 1500')
+                                    if (!perfect_pin.includes(arr[j].pin)) {
+                                        perfect_pin.push(arr[j].pin)
                                     }
-                                }
-                                else {
-                                    // console.log(emp_usedLeave[k].pin + ' : perfect paid 1500')
+
                                 }
                             }
                         }
+                        //กรณ๊ลาพักร้อนเกิน 3 วันหรือลาพักร้อน + วันหยุดรวมกันเกิน 5 วัน
+                        else {
+                            // console.log(arr[j].pin + ' : no attendance ')
+                        }
+                    }
+                    //กรณีไม่เคยลา
+                    if (use == 0) {
+                        // console.log(arr[j].pin + ' : perfect paid 1500')
+                        if (!perfect_pin.includes(arr[j].pin)) {
+                            perfect_pin.push(arr[j].pin)
+                        }
                     }
                 }
-                //ไม่ได้ลา
-                if (use == 'NaN' || use == 0) {
-                    // console.log(emp_usedLeave[k].pin + ' : perfect paid 1500')
+                //กรณ๊วันลาเกิน 5 วันต่อเดือน
+                else {
+                    await cal_hours(arr, arr[j].pin);
                 }
             }
         }
     }
+
+    pin_result.perfect = perfect_pin;
+    pin_result.imperfect_pin = imperfect_pin;
+    
+    console.log(pin_result)
+    return pin_result;
+
 }
 
 module.exports.imPerfectAttenDance = async (req, res) => {
@@ -166,24 +203,15 @@ module.exports.imPerfectAttenDance = async (req, res) => {
         let arr = result.is_late[i];
         for (let j = 0; j < arr.length; j++) {
             let emp_late = arr[j];
-            for (let k = 0; k < emp_late.length; k++) {
-                if (emp_late[k].recordType === recordType.leaveType.BL || emp_late[k].recordType === recordType.leaveType.SL) {
-                    //check time
-                    let start = getTime(emp_late[k].scheduleStartDt);
-                    let end = getTime(emp_late[k].scheduleEndDt);
-                    //calculate time 
-                    let result = (end - start) - 1;
-                    if (result <= 8) {
-                        // console.log(emp_late[k].pin + ' : imperfect paid 500')
-                    }
-                }
-                //ไม่ได้ลา
-                if (emp_late[k].recordType === recordType.ON) {
-                    // console.log(emp_late[k].pin + ' : imperfect paid 500')
-                }
-            }
+            await cal_hours(emp_late, emp_late[j].pin)
         }
     }
+
+    pin_result.perfect = perfect_pin;
+    pin_result.imperfect_pin = imperfect_pin;
+    
+    // console.log(pin_result)
+    return pin_result;
 }
 
 // query list การลาของพนักงาน ขึ้นมาทั้งหมด 
@@ -237,6 +265,32 @@ const getEmployee = async (req, res) => {
 }
 
 
+function cal_hours(array, pin) {
+    let hour = 0;
+    for (let x = 0; x < array.length; x++) {
+        //กรณีมีลาป่วย หรือลากิจ ในเดือนที่มีการลาวันเกิด ต้องไปคำนวณ imperfect
+        if (array[x].recordType === recordType.leaveType.SL || array[x].recordType === recordType.leaveType.BL) {
+            //check time
+            let start = getTime(array[x].scheduleStartDt);
+            let end = getTime(array[x].scheduleEndDt);
+            //calculate time 
+            hour = hour + (end - start) - 1;
+        }
+    }
+    if (hour <= 8) {
+        // console.log(pin + ' : imperfect paid 500')
+        if (!imperfect_pin.includes(pin)) {
+            imperfect_pin.push(pin)
+        }
+    }
+    else {
+        //ไม่ได้ค่าเบี้ยขยัน
+        // console.log(pin + ' : no attendance ')
+    }
+
+    // return imperfect_pin;
+}
+
 function spliceArray(all_emp_array, emp_pin) {
     let no_late = [];
     let userarr = [];
@@ -250,13 +304,9 @@ function spliceArray(all_emp_array, emp_pin) {
         let checklate = false;
         for (let j = 0; j < userarr.length; j++) {
             for (let k = 0; k < emp_pin.length; k++) {
-                // userarr = userarr.filter(function (item) {
-                //     return item !== emp_pin;
-                // })
                 if (userarr[j].pin === emp_pin[k]) {
                     checklate = true;
                 }
-                
             }
         }
         if (checklate) {
@@ -308,7 +358,6 @@ async function checkLate(emp_array) {
             let actual_clockout = getTime(all[j].actualClockoutDt);
             let schedule_start = getTime(all[j].scheduleStartDt);
             let schedule_end = getTime(all[j].scheduleEndDt);
-
             // check ว่าพนักงานมาสาย ? 
             //มาสาย
             if (actual_clockin > schedule_start || actual_clockout < schedule_end) {
@@ -321,7 +370,26 @@ async function checkLate(emp_array) {
             //update flag 
             await updateLateFlag(all[j]);
         }
-
     }
 }
+
+function calVacation(date1, date2) {
+    let dt1 = moment(date1, "YYYY-MM-DD");
+    let dt2 = moment(date2, "YYYY-MM-DD");
+    let diff = dt2.diff(dt1);
+    return diff;
+}
+
+function convertMS(ms) {
+    var day, hour, minute, second;
+    second = Math.floor(ms / 1000);
+    minute = Math.floor(second / 60);
+    second = second % 60;
+    hour = Math.floor(minute / 60);
+    minute = minute % 60;
+    day = Math.floor(hour / 24);
+    hour = hour % 24;
+    return day;
+};
+
 

@@ -42,7 +42,28 @@ const txAvayaPinDetailController = require('../controllers').txAvayaPinDetailCon
 const txAvayaPinHeaderController = require('../controllers').txAvayaPinHeaderController
 const txActivityDetailController = require('../controllers').txActivityDetailController
 const txActivityHeaderController = require('../controllers').txActivityHeaderController
+const SamlStrategy = require('passport-saml').Strategy;
+const passport = require('passport');
 
+const summaryService = require('../service/summary-service');
+
+passport.use(new SamlStrategy(
+  {
+    path: '/login/callback',
+    entryPoint: 'https://openidp.feide.no/simplesaml/saml2/idp/SSOService.php',
+    issuer: 'passport-saml'
+  },
+  function (profile, done) {
+    console.log(profile)
+    console.log(done)
+    findByEmail(profile.email, function (err, user) {
+      if (err) {
+        return done(err);
+      }
+      return done(null, user);
+    });
+  })
+);
 
 module.exports = (app) => {
   app.get('/api', (req, res) => res.status(200).send({
@@ -50,6 +71,9 @@ module.exports = (app) => {
   }));
   app.post('/api/accessInfo', infoAccessController.create);
   app.get('/api/accessInfo/find', infoAccessController.list);
+  app.get('/api/test', (req, res) => {
+    res.redirect('http://10.137.16.118:80/home')
+  });
   app.post('/api/accessInfo/findall', infoAccessController.create);
   app.get('/api/mstParam/findall', mstParamController.list);
   // app.post('/api/txDetailActivity', txActivityDetailController.create);
@@ -68,4 +92,22 @@ module.exports = (app) => {
   //   app.all('/api/todos/:todoId/items', (req, res) => res.status(405).send({
   //     message: 'Method Not Allowed',
   //   }));
+  app.get('/start', (req, res) => {
+    summaryService.processSummaryDetail(req, res);
+    // res.status(200).send({
+    //   message: 'Welcome to the beginning of nothingness.',
+  });
+
+  app.get('/login',
+    passport.authenticate('saml', { failureRedirect: '/', failureFlash: true }),
+    function (req, res) {
+      console.log(req)
+      console.log(res)
+      res.redirect('/');
+    });
+
+  app.get('/login/callback', (req, res) => {
+    console.log('xx')
+    res.redirect('http://10.137.16.118:80/home')
+  });
 };

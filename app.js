@@ -27,24 +27,16 @@ require('./alwapp/router')(app);
 //  cron.schedule('*/10 * * * * *', async function () {
 //   console.log('running every 3 second');
 
-// batchService.copyFromNas();
-// batchService.importSL(); 
-// batchService.importTR();
 
-
-// batchService.copyFromNas();
+batchService.copyFromNas();
 // batchService.importSL();
 
-// test();
-// async function test(){
-//     let perfect = await 
-//     // console.log(perfect)
-//     let imperfect = 
-//     // console.log(imperfect)
-// }
-attendanceService.isPerfectAttenDance();
-attendanceService.imPerfectAttenDance();
-summaryService.processSummaryDetail();
+// batchService.importTR();
+batchService.testQuery();
+
+// attendanceService.isPerfectAttenDance();
+// attendanceService.imPerfectAttenDance();
+// summaryService.processSummaryDetail();
 
 // });
 

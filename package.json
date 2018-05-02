@@ -15,17 +15,25 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
+    "array-to-txt-file": "^1.0.2",
     "body-parser": "^1.18.2",
     "chokidar": "^2.0.3",
     "csvtojson": "^1.1.9",
     "express": "^4.16.2",
+    "line-by-line": "^0.1.6",
     "moment": "^2.21.0",
     "morgan": "^1.9.0",
     "node-cron": "^1.2.1",
     "node-watch": "^0.5.8",
+    "passport": "^0.4.0",
+    "passport-saml": "^0.33.0",
     "pg": "^7.4.1",
+    "pg-format": "^1.0.4",
     "pg-hstore": "^2.3.2",
-    "sequelize": "^4.35.2"
+    "pg-pool": "^2.0.3",
+    "sequelize": "^4.35.2",
+    "soap": "^0.24.0",
+    "sort-by": "^1.2.0"
   },
   "devDependencies": {
     "concurrently": "^3.5.1",

@@ -40,6 +40,11 @@ module.exports = (sequelize, DataTypes) => {
             field: 'agent_name',
             allowNull: false
         },
+        scheduleDate: {
+            type: DataTypes.DATE,
+            field: 'schedule_date',
+            allowNull: true
+        },
         time_zone: {
             type: DataTypes.STRING(50),
             field: 'time_zone',

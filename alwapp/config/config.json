@@ -6,12 +6,16 @@
     "host": "10.138.47.138",
     "dialect": "postgres",
     "logging": false,
+    "dialectOptions": {
+      "useUTC": false
+    },
     "pool": {
       "max": "5",
       "min": "0",
       "acquire": "30000",
       "idle": "10000"
-    },"timezone": "+07:00"
+    },
+    "timezone": "+07:00"
   },
   "test": {
     "username": "root",
