@@ -29,9 +29,9 @@ require('./alwapp/router')(app);
 
 
 batchService.copyFromNas();
-batchService.importSL();
+// batchService.importSL();
 
-// batchService.importTR();
+batchService.importTR();
 // batchService.testQuery();
 
 // attendanceService.isPerfectAttenDance();

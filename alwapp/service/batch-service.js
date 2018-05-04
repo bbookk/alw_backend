@@ -16,12 +16,19 @@ const pg = require('pg')
 const pgFormat = require('pg-format');
 const Pool = require('pg-pool')
 
-let localPathSL = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/SL/';
-let localPathTR = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/TR/';
-let localPath = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/';
-let nasPath = 'C:/Users/dell-2018/Desktop/NAZ/';
-let archire = 'C:/Users/dell-2018/Desktop/alw/app/alw/archire/';
-let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
+// let localPathSL = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/SL/';
+// let localPathTR = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/TR/';
+// let localPath = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/';
+// let nasPath = 'C:/Users/dell-2018/Desktop/NAZ/';
+// let archire = 'C:/Users/dell-2018/Desktop/alw/app/alw/archire/';
+// let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
+
+let localPathSL = 'C:/Users/Asus/Desktop/local/app/ALW/data/SL/';
+let localPathTR = 'C:/Users/Asus/Desktop/local/app/ALW/data/TR/';
+let localPath = 'C:/Users/Asus/Desktop/local/app/ALW/data/';
+let nasPath = 'C:/Users/Asus/Desktop/NAZ/';
+let archire = 'C:/Users/Asus/Desktop/local/app/ALW/archire/';
+// let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
 
 //let folder = getDirectories(localPath) + '/';
 
@@ -354,34 +361,44 @@ async function addToObj(param, filepath) {
                 // await createDetail(param, obj)
                 for (let x = 0; x < obj.length; x++) {
                     arr_summary = obj[x];
-                    
-                    if (param == 'SL') { 
+                    let check = true;
+                    if (param == 'SL') {
+                        //check if element in array qre equal don't push
+                        for (let loop = 0; loop < arr.length; loop++) {
+                            let ans = arr[loop];
+                            if (ans[0] === arr_summary[2] && ans[1] === arr_summary[4]) {
+                                check = false
+                                break;
+                            }
+                        }
                         //arr_summary[2] is ssn , arr_summay[4] is schedule date in file SL
-                        arr.push(mapToArraySummary(arr_summary[2], arr_summary[4], 'headerId', param))
+                        if (check)
+                            arr.push(mapToArraySummary(arr_summary[2], arr_summary[4], 'headerId', param))
                     }
                     else if (param == 'TR') {
+                        //check if element in array qre equal don't push
+                        for (let loop = 0; loop < arr.length; loop++) {
+                            let ans = arr[loop];
+                            if (ans[0] === arr_summary[2] && ans[1] === arr_summary[5]) {
+                                check = false
+                                break;
+                            }
+                        }
                         //arr_summary[2] is ssn , arr_summay[5] is schedule date in file TR
-                        arr.push(mapToArraySummary(arr_summary[2], arr_summary[5], 'headerId', param))
-                    } 
+                        if (check)
+                            arr.push(mapToArraySummary(arr_summary[2], arr_summary[5], 'headerId', param))
+                    }
                 }
             });
         }
-    
-        for(let y = 0; y < arr.length; y++){
-             console.log(arr[y+1].toString())
-            if(arr[y].toString() === arr[y+1].toString()){
-                delete arr[y+1];
-            }
-        }
 
-        console.log(arr)
         // console.log('stamp all data to db')
         // let summary_check_arr = [];
         // summary_check_arr = chunk(arr, 1000);
         // for(let y = 0; y < summary_check_arr.length; y++){
         //     // await createSummaryCheck(summary_check_arr[y]);
         // }
-        // console.log(arr)
+
 
 
 
@@ -391,9 +408,9 @@ async function addToObj(param, filepath) {
         // console.log(param + ' File success on ' + second + ' second')
 
         //move .dat.proc and .sync.proc to archire folder (ไฟล์หลัก) 
-        let sync_proc = getPath(param) + filename + '.sync.proc';
-        moveFile(param, filepath)
-        moveFile(param, sync_proc)
+        // let sync_proc = getPath(param) + filename + '.sync.proc';
+        // moveFile(param, filepath)
+        // moveFile(param, sync_proc)
     });
 }
 
