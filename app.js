@@ -29,10 +29,10 @@ require('./alwapp/router')(app);
 
 
 batchService.copyFromNas();
-// batchService.importSL();
+batchService.importSL();
 
 // batchService.importTR();
-batchService.testQuery();
+// batchService.testQuery();
 
 // attendanceService.isPerfectAttenDance();
 // attendanceService.imPerfectAttenDance();

@@ -32,8 +32,7 @@
     "pg-hstore": "^2.3.2",
     "pg-pool": "^2.0.3",
     "sequelize": "^4.35.2",
-    "soap": "^0.24.0",
-    "sort-by": "^1.2.0"
+    "soap": "^0.24.0"
   },
   "devDependencies": {
     "concurrently": "^3.5.1",
