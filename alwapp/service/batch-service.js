@@ -16,23 +16,24 @@ const pg = require('pg')
 const pgFormat = require('pg-format');
 const Pool = require('pg-pool')
 
-// let localPathSL = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/SL/';
-// let localPathTR = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/TR/';
-// let localPath = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/';
-// let nasPath = 'C:/Users/dell-2018/Desktop/NAZ/';
-// let archire = 'C:/Users/dell-2018/Desktop/alw/app/alw/archire/';
-// let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
+let localPathSL = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/SL/';
+let localPathTR = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/TR/';
+let localPath = 'C:/Users/dell-2018/Desktop/alw/app/alw/data/';
+let nasPath = 'C:/Users/dell-2018/Desktop/NAZ/';
+let archire = 'C:/Users/dell-2018/Desktop/alw/app/alw/archire/';
+let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
 
-let localPathSL = 'C:/Users/Asus/Desktop/local/app/ALW/data/SL/';
-let localPathTR = 'C:/Users/Asus/Desktop/local/app/ALW/data/TR/';
-let localPath = 'C:/Users/Asus/Desktop/local/app/ALW/data/';
-let nasPath = 'C:/Users/Asus/Desktop/NAZ/';
-let archire = 'C:/Users/Asus/Desktop/local/app/ALW/archire/';
+// let localPathSL = 'C:/Users/Asus/Desktop/local/app/ALW/data/SL/';
+// let localPathTR = 'C:/Users/Asus/Desktop/local/app/ALW/data/TR/';
+// let localPath = 'C:/Users/Asus/Desktop/local/app/ALW/data/';
+// let nasPath = 'C:/Users/Asus/Desktop/NAZ/';
+// let archire = 'C:/Users/Asus/Desktop/local/app/ALW/archire/';
 // let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
 
 //let folder = getDirectories(localPath) + '/';
 
 let format = 'YYYY-MM-DD HH:mm:ss';
+let dateFormat = 'YYYY-MM-DD';
 const keyPath = {
     SL: 'SL',
     TR: 'TR',
@@ -316,11 +317,10 @@ function getnameSync(sync_proc) {
     let sync_name = path.parse(sync_proc).name;
     return sync_name;
 }
-let result = false;
 
 async function addToObj(param, filepath) {
     let sum = -2; //delete header file 2 line
-    console.log('adding obj')
+    console.log(param + ' adding obj')
     let objTR = [], data = [];
     let arr_file = [];
     let file_split;
@@ -391,34 +391,92 @@ async function addToObj(param, filepath) {
                 }
             });
         }
+        console.log(param + ' stamp all data to db');
 
-        // console.log('stamp all data to db')
-        // let summary_check_arr = [];
-        // summary_check_arr = chunk(arr, 1000);
-        // for(let y = 0; y < summary_check_arr.length; y++){
-        //     // await createSummaryCheck(summary_check_arr[y]);
-        // }
+        let end = new Date().getTime();
+        let time = end - start;
+        let second = convertMS(time)
+        console.log(param + ' File success on ' + second + ' second')
+       
+        let pin = [];
+        let sl, tr;
 
-
-
-
-        // let end = new Date().getTime();
-        // let time = end - start;
-        // let second = convertMS(time)
-        // console.log(param + ' File success on ' + second + ' second')
+        if (param === 'SL') {
+            await createSummaryCheck(arr);
+            console.log('insert to summary check success')
+        }
+        //เก็บ pin จากอาเรย์ที่ได้หลังจากตัดตัวซ้ำ เพื่อเอาไป query ต่อ 
+        for (let y = 0; y < arr.length; y++) {
+            let sub_arr = [];
+            sub_arr = arr[y];
+            if (!pin.includes(sub_arr[0])) {
+                pin.push(sub_arr[0]);
+            }
+            sl = sub_arr[2]; //sl flag
+            tr = sub_arr[3];//tr flag
+        }
+        //update data in info_summary_check
+        await checkFile_update(arr, pin, sl, tr);
 
         //move .dat.proc and .sync.proc to archire folder (ไฟล์หลัก) 
-        // let sync_proc = getPath(param) + filename + '.sync.proc';
-        // moveFile(param, filepath)
-        // moveFile(param, sync_proc)
+        let sync_proc = getPath(param) + filename + '.sync.proc';
+        moveFile(param, filepath)
+        moveFile(param, sync_proc)
     });
+}
+
+async function checkFile_update(arr, pin, sl_flag, tr_flag) {
+    let result = {};
+    //SL before TR
+    if (sl_flag === 'Y' && tr_flag === 'N') {
+        let data_update;
+        for (let x = 0; x < pin.length; x++) {
+            //query data ว่ามี pin นี้รึยังใน TR 
+            data_update = await getSummaryCheck(pin[x]);
+            if (data_update !== undefined) {
+                for (let t = 0; t < arr.length; t++) {
+                    let a = arr[t];
+                    if (a[0] === data_update.ssn) {
+                        a[3] = 'Y';//tr flag
+                        result.flag = a[3];
+                        result.pin = data_update.ssn;
+                        result.headerId = data_update.headerId;
+                    }
+                }
+            }
+            //update headerId and Tr_flag
+            await updateFlag(result)
+        }
+    }
+    //insert TR before SL
+    if (sl_flag === 'N' && tr_flag === 'Y') {
+        let data_update;
+        for (let x = 0; x < pin.length; x++) {
+            data_update = await getSummaryCheck(pin[x]);
+            if (data_update !== undefined) {
+                for (let t = 0; t < arr.length; t++) {
+                    let a = arr[t];
+                    if (a[0] === data_update.ssn) {
+                        a[2] = 'Y';//sl flag
+                        result.flag = a[2];
+                        result.pin = data_update.ssn;
+                        result.headerId = data_update.headerId;
+                    }
+                }
+            }
+            await updateFlag(result)
+        }
+    }
+    console.log('update to info_summary success')
 }
 
 function mapToArraySummary(pin, recordDt, headerId, param) {
     let sl_flag, tr_flag, sl_headerId, tr_headerId, sum_flag, sum_startDt, sum_endDt;
+    let today = moment();
+    let today_dt = moment(today).format(dateFormat);
     sum_flag = 'N';
-    sum_startDt = '2018-05-04';
-    sum_endDt = '2018-05-04';
+    sum_startDt = today_dt;
+    sum_endDt = today_dt;
     if (param == 'SL') {
         sl_headerId = headerId;
         sl_flag = 'Y';
@@ -481,6 +539,52 @@ function moveFile(param, filepath) {
     })
 }
 
+async function createSummaryCheck(obj) {
+    let insertData = pgFormat('INSERT INTO public.info_summary_check (pin, record_dt, sl_flag, tr_flag, sl_header_id, tr_header_id, gen_sum_flag, gen_sum_start_dt, gen_sum_end_dt) VALUES %L', obj);
+    (async () => {
+        var client = await pool.connect()
+        try {
+            var result = await client.query(insertData)
+        } finally {
+            client.release()
+        }
+    })().catch(e => console.error(e.message, e.stack))
+}
+
+const updateFlag = async (req, res) => {
+    let updateData = pgFormat('UPDATE public.info_summary_check SET tr_flag = %L , tr_header_id = %L WHERE pin = %L', req.flag, req.headerId, req.pin);
+
+    (async () => {
+        var client = await pool.connect()
+        try {
+            var result = await client.query(updateData)
+        } finally {
+            client.release()
+        }
+    })().catch(e => console.error(e.message, e.stack))
+}
+
+const getSummaryCheck = async (req, res) => {
+    let result = {};
+    return await modelTrDetail.
+        findAll({
+            where: {
+                ssn: req,
+            },
+            include: [{
+                all: true
+            }], raw: true,
+        }).then(res => {
+            for (let i = 0; i < res.length; i++) {
+                result.ssn = res[i].ssn;
+                result.headerId = res[i].headerId
+                return result;
+            }
+        })
+}
+
+
+
 let mockPin = {
     emp_id: '539453'
 }
@@ -489,7 +593,6 @@ module.exports.testQuery = async (req, res) => {
     req = mockPin;
     return await modelSlDetail.
         findAll({
-            // scheduleDate: sequelize.cast(sequelize.col("schedule_date"), 'text'),
             where: {
                 emp_id: req.emp_id,
             },
@@ -497,12 +600,6 @@ module.exports.testQuery = async (req, res) => {
                 all: true
             }], raw: true,
         }).then(res => {
-
-            // objSL.sort();
-            // sortTime(objTR, 'true');
-            // console.log(obj_ordered)
-            // console.log(res);
-            //    console.log(res)            
             return res;
         })
 }
@@ -518,18 +615,3 @@ function convertMS(ms) {
     hour = hour % 24;
     return second;
 };
-
-async function createSummaryCheck(obj) {
-    console.log('insert to info summary check')
-    let insertData = pgFormat('INSERT INTO public.info_summary_check (pin, record_dt, sl_flag, tr_flag, sl_header_id, tr_header_id, gen_sum_flag, gen_sum_start_dt, gen_sum_end_dt) VALUES %L', obj);
-
-    // with async/await 
-    (async () => {
-        var client = await pool.connect()
-        try {
-            var result = await client.query(insertData)
-        } finally {
-            client.release()
-        }
-    })().catch(e => console.error(e.message, e.stack))
-}
