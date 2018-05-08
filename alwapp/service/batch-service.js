@@ -8,7 +8,7 @@ const chokidar = require('chokidar');
 const watch = require('node-watch');
 const csv = require('csvtojson');
 const moment = require('moment');
-const fs = require('fs');
+const fs = require('fs-extra');
 const path = require('path');
 const arrayToTxtFile = require('array-to-txt-file')
 const Sequelize = require('sequelize');
@@ -53,7 +53,6 @@ const config = {
 };
 
 const pool = new Pool(config);
-var myClient;
 
 module.exports.copyFromNas = async (req, res) => {
     var dir_name = getDirectories(nasPath);
@@ -81,15 +80,20 @@ module.exports.copyFromNas = async (req, res) => {
     console.log('copy file from NAS success')
 }
 
-module.exports.importTR = (req, res) => {
+module.exports.importTR = async (req, res) => {
     console.log('import TR')
-    let pathWatchTR = getPath('TR')
-    let watcher = chokidar.watch(pathWatchTR, { ignored: /^\./, persistent: true });
-    let objFileTR = [];
-    watcher
-        .on('add' || 'change', async function (path) {
-            // console.log('File in TR', path, 'has been added or change');
-            let rename = await renameToDAT('TR', path);
+    let pathTR = getPath('TR')
+    let watcher = chokidar.watch(pathTR, { ignored: /^\./, persistent: true });
+    await watcher
+        .on('add' || 'change', async function (file) {
+            if (path.parse(file).ext === '.txt') {
+                console.log('File in TR', file, 'has been added or change');
+                let sync = await createSyncFile(file);
+            }
+            if (path.parse(file).ext === '.sync') {
+                console.log('File sync TR has been added or change');
+                let read = await renameToProcess(file);
+            }
         })
         .on('unlink', function (path) {
             // console.log('File', path, 'has been removed');
@@ -101,12 +105,18 @@ module.exports.importTR = (req, res) => {
 
 module.exports.importSL = async (req, res) => {
     console.log('import SL')
-    let pathWatchSL = getPath('SL')
-    let watcher = chokidar.watch(pathWatchSL, { ignored: /^\./, persistent: true });
+    let pathSL = getPath('SL')
+    let watcher = chokidar.watch(pathSL, { ignored: /^\./, persistent: true });
     await watcher
-        .on('add' || 'change', async function (path) {
-            // console.log('File in SL', path, 'has been added or change');
-            let rename = await renameToDAT('SL', path);
+        .on('add' || 'change', async function (file) {
+            if (path.parse(file).ext === '.txt') {
+                console.log('File in SL', file, 'has been added or change');
+                let sync = await createSyncFile(file);
+            }
+            if (path.parse(file).ext === '.sync') {
+                console.log('File sync SL has been added or change');
+                let read = await renameToProcess(file);
+            }
         })
         .on('unlink', function (path) {
             // console.log('File', path, 'has been removed');
@@ -256,61 +266,35 @@ function getDirectories(path) {
     });
 }
 
-async function renameToDAT(param, file) {
-    let dat_path;
-    let filename = path.parse(file).name;
-    if (param === 'TR') {
-        dat_path = getPath('TR') + filename + '.dat'
-    }
-    if (param === 'SL') {
-        dat_path = getPath('SL') + filename + '.dat'
-    }
-    if (path.parse(file).ext == '.csv') {
-        fs.rename(file, dat_path, async function (err) {
-            if (err) console.log(err)
-            console.log('rename to dat')
-            let sync = await createSyncFile(dat_path);
-        })
-    }
-    return dat_path;
-}
-
-function createSyncFile(dat_path) {
-    let dat_file, sync_file, dir;
-    dat_file = path.parse(dat_path).name;
-    dir = path.parse(dat_path).dir + '/';
-    sync_file = dir + dat_file + '.sync';
-    let sync_name = dir + dat_file;
-    fs.writeFile(sync_file, dat_file + '.dat', async function (err) {
+function createSyncFile(txt_path) {
+    let txt_fileName = path.parse(txt_path).base;
+    let sync_file = txt_path.replace('.txt', '.sync');
+    fs.writeFile(sync_file, txt_fileName, async function (err) {
         if (err) throw err;
         console.log('create sync file');
-        let read = await readDataToObj(sync_name);
     });
-    return sync_name;
+    return sync_file;
 }
 
-function readDataToObj(sync_path) {
-    let sync_name = path.parse(sync_path).name;
-    let dir = path.parse(sync_path).dir;
-    let dir_name = path.parse(dir).name;
-    let dat = sync_path + '.dat';
-    let dat_proc = sync_path + '.dat.proc';
-    let sync = sync_path + '.sync';
-    let sync_proc = sync_path + '.sync.proc';
-    if (fs.existsSync(sync)) {
-        fs.rename(sync, sync_proc, function (err) {
+function renameToProcess(sync_path) {
+    let sync_proc = sync_path +'.proc';
+    let txt_name = sync_path.replace('.sync', '.txt');
+    let txt_proc = txt_name + '.proc';
+    let dir_name = path.parse(path.parse(sync_path).dir).name;
+    if (fs.existsSync(sync_path)) {
+        fs.rename(sync_path, sync_proc, function (err) {
             if (err) console.log(err)
-            if (fs.existsSync(dat)) {
-                fs.rename(dat, dat_proc, async function (err) {
+            if (fs.existsSync(txt_name)) {
+                fs.rename(txt_name, txt_proc, async function (err) {
                     if (err) console.log(err)
                     console.log('read data')
-                    let add = await addToObj(dir_name, dat_proc)
+                    let add = await addToObj(dir_name, txt_proc)
                     getnameSync(sync_proc); //get name of sync proc file
                 });
             }
         });
     }
-    return dat_proc;
+    // return dat_proc;
 }
 
 function getnameSync(sync_proc) {
@@ -320,13 +304,15 @@ function getnameSync(sync_proc) {
 
 async function addToObj(param, filepath) {
     let sum = -2; //delete header file 2 line
-    console.log(param + ' adding obj')
     let objTR = [], data = [];
     let arr_file = [];
     let file_split;
     let file = path.parse(filepath).name;
     let filename = path.parse(file).name;
+
+    console.log(file + ' adding obj')
     let start = new Date().getTime();// startto count time
+
     var LineByLineReader = require('line-by-line'),
         lr = new LineByLineReader(filepath);
     lr.on('error', function (err) {
@@ -391,13 +377,13 @@ async function addToObj(param, filepath) {
                 }
             });
         }
-        console.log(param + ' stamp all data to db');
+        console.log(file + ' stamp all data to db');
 
         let end = new Date().getTime();
         let time = end - start;
         let second = convertMS(time)
-        console.log(param + ' File success on ' + second + ' second')
-       
+        console.log(file + ' File success on ' + second + ' second')
+
         let pin = [];
         let sl, tr;
 
@@ -418,7 +404,7 @@ async function addToObj(param, filepath) {
         //update data in info_summary_check
         await checkFile_update(arr, pin, sl, tr);
 
-        //move .dat.proc and .sync.proc to archire folder (ไฟล์หลัก) 
+        //move .txt.proc and .sync.proc to archire folder (ไฟล์หลัก) 
         let sync_proc = getPath(param) + filename + '.sync.proc';
         moveFile(param, filepath)
         moveFile(param, sync_proc)
@@ -426,7 +412,11 @@ async function addToObj(param, filepath) {
 }
 
 async function checkFile_update(arr, pin, sl_flag, tr_flag) {
-    let result = {};
+    let flag = [];
+    let pin_arr = [];
+    let headerId = [];
+    let recordDt = [];
+    console.log('updateing...')
     //SL before TR
     if (sl_flag === 'Y' && tr_flag === 'N') {
         let data_update;
@@ -438,35 +428,42 @@ async function checkFile_update(arr, pin, sl_flag, tr_flag) {
                     let a = arr[t];
                     if (a[0] === data_update.ssn) {
                         a[3] = 'Y';//tr flag
-                        result.flag = a[3];
-                        result.pin = data_update.ssn;
-                        result.headerId = data_update.headerId;
+                        flag.push(a[3]);
+                        pin_arr.push(data_update.ssn);
+                        headerId.push(data_update.headerId);
+                        recordDt.push(data_update.schedule_date);
+                        // result.flag = a[3];
+                        // result.pin = data_update.ssn;
+                        // result.headerId = data_update.headerId;
                     }
                 }
             }
+          
             //update headerId and Tr_flag
-            await updateFlag(result)
+            // await updateFlag(pin_arr, flag , headerId, recordDt)
         }
     }
-    //insert TR before SL
-    if (sl_flag === 'N' && tr_flag === 'Y') {
-        let data_update;
-        for (let x = 0; x < pin.length; x++) {
-            data_update = await getSummaryCheck(pin[x]);
-            if (data_update !== undefined) {
-                for (let t = 0; t < arr.length; t++) {
-                    let a = arr[t];
-                    if (a[0] === data_update.ssn) {
-                        a[2] = 'Y';//sl flag
-                        result.flag = a[2];
-                        result.pin = data_update.ssn;
-                        result.headerId = data_update.headerId;
-                    }
-                }
-            }
-            await updateFlag(result)
-        }
-    }
+    //  console.log(pin_arr)
+    // //insert TR before SL
+    // if (sl_flag === 'N' && tr_flag === 'Y') {
+    //     let data_update;
+    //     for (let x = 0; x < pin.length; x++) {
+    //         data_update = await getSummaryCheck(pin[x]);
+    //         if (data_update !== undefined) {
+    //             for (let t = 0; t < arr.length; t++) {
+    //                 let a = arr[t];
+    //                 if (a[0] === data_update.ssn) {
+    //                     a[2] = 'Y';//sl flag
+    //                     result.flag = a[2];
+    //                     result.pin = data_update.ssn;
+    //                     result.headerId = data_update.headerId;
+    //                 }
+    //             }
+    //         }
+    //         await updateFlag(result)
+    //     }
+    // }
+    await updateFlag(pin_arr, flag , headerId, recordDt)
     console.log('update to info_summary success')
 }
 
@@ -551,9 +548,10 @@ async function createSummaryCheck(obj) {
     })().catch(e => console.error(e.message, e.stack))
 }
 
-const updateFlag = async (req, res) => {
-    let updateData = pgFormat('UPDATE public.info_summary_check SET tr_flag = %L , tr_header_id = %L WHERE pin = %L', req.flag, req.headerId, req.pin);
+function updateFlag(pin , flag, headerId, recordDt){
+    let updateData = pgFormat('UPDATE public.info_summary_check SET tr_flag = %L , tr_header_id = %L WHERE pin = %L AND record_dt = %L', flag, headerId, pin, recordDt);
 
+    console.log(updateData)
     (async () => {
         var client = await pool.connect()
         try {
@@ -564,7 +562,7 @@ const updateFlag = async (req, res) => {
     })().catch(e => console.error(e.message, e.stack))
 }
 
-const getSummaryCheck = async (req, res) => {
+const getSummaryCheck = async (req ,res) => {
     let result = {};
     return await modelTrDetail.
         findAll({
@@ -578,6 +576,7 @@ const getSummaryCheck = async (req, res) => {
             for (let i = 0; i < res.length; i++) {
                 result.ssn = res[i].ssn;
                 result.headerId = res[i].headerId
+                result.schedule_date = res[i].schedule_date;
                 return result;
             }
         })
