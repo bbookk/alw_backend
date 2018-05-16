@@ -2,7 +2,7 @@ const modelTrHeader = require('../models').TxTrHeader;
 const modelTrDetail = require('../models').TxTrDetail;
 const modelSlHeader = require('../models').TxSlHeader;
 const modelSlDetail = require('../models').TxSlDetail;
-const modelinfoSummary = require('../models').InfoSummaryCheck;
+const modelInfoSummary = require('../models').InfoSummaryCheck;
 const model = require('../models');
 const chokidar = require('chokidar');
 const watch = require('node-watch');
@@ -32,8 +32,9 @@ let nasPathTR = 'C:/Users/dell-2018/Desktop/NAZ/TR/';
 
 //let folder = getDirectories(localPath) + '/';
 
+let start_process = new Date().getTime();// startto count time
 let format = 'YYYY-MM-DD HH:mm:ss';
-let dateFormat = 'YYYY-MM-DD';
+let dateFormat = 'YYYY-MM-DD 00:00:00';
 const keyPath = {
     SL: 'SL',
     TR: 'TR',
@@ -82,17 +83,27 @@ module.exports.copyFromNas = async (req, res) => {
 
 module.exports.importTR = async (req, res) => {
     console.log('import TR')
-    let pathTR = getPath('TR')
+    let pathTR = getPath(keyPath.TR)
     let watcher = chokidar.watch(pathTR, { ignored: /^\./, persistent: true });
+    let txtFile = [];
+    let syncFile = [];
     await watcher
         .on('add' || 'change', async function (file) {
             if (path.parse(file).ext === '.txt') {
                 console.log('File in TR', file, 'has been added or change');
+                // txtFile.push(file);
+                // for(let i = 0; i < txtFile.length; i++){
                 let sync = await createSyncFile(file);
+                // }
+                // watcher.close();
             }
             if (path.parse(file).ext === '.sync') {
                 console.log('File sync TR has been added or change');
+                // syncFile.push(file);
+                // for(let i = 0; i < txtFile.length; i++){
                 let read = await renameToProcess(file);
+                // }
+                // watcher.close();
             }
         })
         .on('unlink', function (path) {
@@ -105,16 +116,16 @@ module.exports.importTR = async (req, res) => {
 
 module.exports.importSL = async (req, res) => {
     console.log('import SL')
-    let pathSL = getPath('SL')
+    let pathSL = getPath(keyPath.SL)
     let watcher = chokidar.watch(pathSL, { ignored: /^\./, persistent: true });
     await watcher
         .on('add' || 'change', async function (file) {
             if (path.parse(file).ext === '.txt') {
-                console.log('File in SL', file, 'has been added or change');
+                // console.log('File in SL', file, 'has been added or change');
                 let sync = await createSyncFile(file);
             }
             if (path.parse(file).ext === '.sync') {
-                console.log('File sync SL has been added or change');
+                // console.log('File sync SL has been added or change');
                 let read = await renameToProcess(file);
             }
         })
@@ -130,7 +141,7 @@ async function createHeader(file, param, len) {
     let today = moment();
     let today_dt = moment(today).format(format);
     let header, headerId;
-    if (param === 'SL') {
+    if (param === keyPath.SL) {
         header = await modelSlHeader.create({
             fileName: file,
             recSuccess: len,
@@ -141,7 +152,7 @@ async function createHeader(file, param, len) {
             createBy: 'batch',
         })
     }
-    if (param === 'TR') {
+    if (param === keyPath.TR) {
         header = await modelTrHeader.create({
             fileName: file,
             recSuccess: len,
@@ -157,7 +168,7 @@ async function createHeader(file, param, len) {
 }
 
 async function createDetail(param, objTR) {
-    if (param === 'SL') {
+    if (param === keyPath.SL) {
         let insertData = pgFormat('INSERT INTO public.tx_sl_detail (header_id, emp_id, ssn, activity, schedule_date, time_zone, start_dt, stop_dt, exec_date, create_dt, create_by) VALUES %L', objTR);
         (async () => {
             var client = await pool.connect()
@@ -168,7 +179,7 @@ async function createDetail(param, objTR) {
             }
         })().catch(e => console.error(e.message, e.stack))
     }
-    if (param === 'TR') {
+    if (param === keyPath.TR) {
         let insertData = pgFormat('INSERT INTO public.tx_tr_detail (header_id, modify, ssn, organize_name, agent_name, schedule_date, time_zone, activity, start_dt, stop_dt, create_dt, create_by) VALUES %L', objTR);
         (async () => {
             var client = await pool.connect()
@@ -276,25 +287,30 @@ function createSyncFile(txt_path) {
     return sync_file;
 }
 
-function renameToProcess(sync_path) {
-    let sync_proc = sync_path +'.proc';
-    let txt_name = sync_path.replace('.sync', '.txt');
-    let txt_proc = txt_name + '.proc';
-    let dir_name = path.parse(path.parse(sync_path).dir).name;
-    if (fs.existsSync(sync_path)) {
-        fs.rename(sync_path, sync_proc, function (err) {
+function renameToProcess(syncPath) {
+    console.log('rename to proc');
+    let obj = {};
+    let syncProc = syncPath + '.proc';
+    let txtName = syncPath.replace('.sync', '.txt');
+    let txtProc = txtName + '.proc';
+    let dirName = path.parse(path.parse(syncPath).dir).name;
+    if (fs.existsSync(syncPath)) {
+        fs.rename(syncPath, syncProc, function (err) {
             if (err) console.log(err)
-            if (fs.existsSync(txt_name)) {
-                fs.rename(txt_name, txt_proc, async function (err) {
+            if (fs.existsSync(txtName)) {
+                fs.rename(txtName, txtProc, async function (err) {
                     if (err) console.log(err)
                     console.log('read data')
-                    let add = await addToObj(dir_name, txt_proc)
-                    getnameSync(sync_proc); //get name of sync proc file
+                    await addToObj(dirName, txtProc)
+                    getnameSync(syncProc); //get name of sync proc file
                 });
             }
         });
     }
-    // return dat_proc;
+    obj.dirName = dirName;
+    obj.txtProc = txtProc;
+    // console.log(obj)
+    return obj;
 }
 
 function getnameSync(sync_proc) {
@@ -307,29 +323,29 @@ async function addToObj(param, filepath) {
     let objTR = [], data = [];
     let arr_file = [];
     let file_split;
-    let file = path.parse(filepath).name;
-    let filename = path.parse(file).name;
+    let file = path.parse(filepath).name;//file.txt or file.sync
+    let filename = path.parse(file).name;//filename not have extension file
 
     console.log(file + ' adding obj')
     let start = new Date().getTime();// startto count time
 
-    var LineByLineReader = require('line-by-line'),
+    var LineByLineReader = require('line-by-line'),//read data from main file line-by-line
         lr = new LineByLineReader(filepath);
     lr.on('error', function (err) {
         // 'err' contains error object
     });
     lr.on('line', function (line) {
-        objTR.push(line);
+        objTR.push(line);//obj to keep data all line in file
         if (line === '') {
-            // sum--;
         } else {
-            sum++;
+            sum++;//sum to count line of file
         }
     });
     lr.on('end', async function () {
         let obj_summary = {};
         data = chunk(objTR.slice(3), 1000)
-        // let headerId = await createHeader(filename, param, sum)
+        // let headerId = await createHeader(filename, param, sum)//create headerId to stamp in db
+        let headerId = 0;
         for (let i = 0; i < data.length; i++) {
             file_split = filepath + '.part' + i;
             arrayToTxtFile(data[i], file_split, err => {
@@ -340,131 +356,131 @@ async function addToObj(param, filepath) {
             })
             arr_file.push(file_split)
         }
+
         let arr = [];
         let arr_summary = [];
+
         for (let j = 0; j < arr_file.length; j++) {
-            await readInSplit(arr_file[j], param, 'headerId').then(async (obj) => {
-                // await createDetail(param, obj)
+            await readInSplit(arr_file[j], param, headerId).then(async (obj) => {//read data in split file
+                fs.appendFile('output.txt', filepath + '\r\n', function (err) {
+                    if (err) throw err;
+                    console.log('Saved!');
+                });
+                // await createDetail(param, obj) //stamp obj in split file to db
                 for (let x = 0; x < obj.length; x++) {
                     arr_summary = obj[x];
                     let check = true;
-                    if (param == 'SL') {
-                        //check if element in array qre equal don't push
+                    if (param == keyPath.SL) {
+                        //check if element in array have primary are equal don't push
                         for (let loop = 0; loop < arr.length; loop++) {
-                            let ans = arr[loop];
-                            if (ans[0] === arr_summary[2] && ans[1] === arr_summary[4]) {
+                            let subArray = arr[loop];
+                            //check pin and recordDt are equal?
+                            if (subArray[0] === arr_summary[2] && subArray[1] === arr_summary[4]) {
                                 check = false
                                 break;
                             }
                         }
                         //arr_summary[2] is ssn , arr_summay[4] is schedule date in file SL
                         if (check)
-                            arr.push(mapToArraySummary(arr_summary[2], arr_summary[4], 'headerId', param))
+                            //array is have not same primary key (pin + recordDt)
+                            arr.push(mapToArraySummary(arr_summary[2], arr_summary[4], headerId, param))
                     }
-                    else if (param == 'TR') {
-                        //check if element in array qre equal don't push
+                    else if (param == keyPath.TR) {
+                        //check if element in array have primary are equal don't push
                         for (let loop = 0; loop < arr.length; loop++) {
-                            let ans = arr[loop];
-                            if (ans[0] === arr_summary[2] && ans[1] === arr_summary[5]) {
+                            let subArray = arr[loop];
+                            //check pin and recordDt are equal?
+                            if (subArray[0] === arr_summary[2] && subArray[1] === arr_summary[5]) {
                                 check = false
                                 break;
                             }
                         }
                         //arr_summary[2] is ssn , arr_summay[5] is schedule date in file TR
                         if (check)
-                            arr.push(mapToArraySummary(arr_summary[2], arr_summary[5], 'headerId', param))
+                            //array is have not same primary key (pin + recordDt)
+                            arr.push(mapToArraySummary(arr_summary[2], arr_summary[5], headerId, param))
                     }
                 }
             });
         }
-        console.log(file + ' stamp all data to db');
 
+        //ค่า arr คือค่าที่เก็บอาเรย์ข้อมูลที่มี pin , recordDt เป็น primary key
         let end = new Date().getTime();
         let time = end - start;
         let second = convertMS(time)
-        console.log(file + ' File success on ' + second + ' second')
+        console.log(file + ' stamp all data to db success on ' + second + ' second')
 
-        let pin = [];
-        let sl, tr;
+        let pin = [];//เก็บค่า pin ที่มีใน arr 
+        let pin_query_date = [];//เก็บค่า pin เพื่อเอาไปจับคู่กับ recordDt ทั้งหมดในเดือน เพื่อเอาไปทำ auto insert ต่อไป
+        let recordDt = [];//เก็บค่า recordDt ที่มีใน arr 
 
-        if (param === 'SL') {
-            await createSummaryCheck(arr);
-            console.log('insert to summary check success')
-        }
-        //เก็บ pin จากอาเรย์ที่ได้หลังจากตัดตัวซ้ำ เพื่อเอาไป query ต่อ 
+        // let start_update = new Date().getTime();// startto count time
+        // เก็บ pin , recordDt จากอาเรย์ที่ได้หลังจากตัดตัวซ้ำ เพื่อเอาไป query ต่อ 
         for (let y = 0; y < arr.length; y++) {
-            let sub_arr = [];
-            sub_arr = arr[y];
-            if (!pin.includes(sub_arr[0])) {
-                pin.push(sub_arr[0]);
+            let subArr = [];
+            subArr = arr[y];
+            pin.push(subArr[0]);
+            recordDt.push(subArr[1]);
+
+            if (!pin_query_date.includes(subArr[0])) {
+                pin_query_date.push(subArr[0]) //pin to query for auto_insert process
             }
-            sl = sub_arr[2]; //sl flag
-            tr = sub_arr[3];//tr flag
+            ssnArr = pin_query_date;
         }
-        //update data in info_summary_check
-        await checkFile_update(arr, pin, sl, tr);
+        // console.log(pin_query_date)
+        let start_update = new Date().getTime();// start to count time
+        console.log('inserting to info_summary_check....')
+        for (let k = 0; k < pin.length; k++) {
+            //query pin , headerId , recordDt from info_summary_check 
+            //เพื่อดูว่ามีใน table รึยังถ้ามีก็ update header ถ้าไม่มีก็ insert ลงไปใหม่
+            // let dataUpdate = await getSummaryCheck(pin[k], recordDt[k], arr[k], param);
+        }
 
-        //move .txt.proc and .sync.proc to archire folder (ไฟล์หลัก) 
-        let sync_proc = getPath(param) + filename + '.sync.proc';
-        moveFile(param, filepath)
-        moveFile(param, sync_proc)
-    });
-}
-
-async function checkFile_update(arr, pin, sl_flag, tr_flag) {
-    let flag = [];
-    let pin_arr = [];
-    let headerId = [];
-    let recordDt = [];
-    console.log('updateing...')
-    //SL before TR
-    if (sl_flag === 'Y' && tr_flag === 'N') {
-        let data_update;
-        for (let x = 0; x < pin.length; x++) {
-            //query data ว่ามี pin นี้รึยังใน TR 
-            data_update = await getSummaryCheck(pin[x]);
-            if (data_update !== undefined) {
-                for (let t = 0; t < arr.length; t++) {
-                    let a = arr[t];
-                    if (a[0] === data_update.ssn) {
-                        a[3] = 'Y';//tr flag
-                        flag.push(a[3]);
-                        pin_arr.push(data_update.ssn);
-                        headerId.push(data_update.headerId);
-                        recordDt.push(data_update.schedule_date);
-                        // result.flag = a[3];
-                        // result.pin = data_update.ssn;
-                        // result.headerId = data_update.headerId;
+        console.log('updating info_summary_check....')
+        let obj = {};
+        let headerIdArr, pinArr, flag, recordDtArr;
+        for (let k = 0; k < arr.length; k++) {
+            //update tr header in info_summary_success
+            let sub_arr = arr[k];
+            for (let j = 0; j < sub_arr.length; j++) {
+                if (sub_arr[0] !== '') {
+                    if (param === keyPath.SL) {
+                        sub_arr[2] = 'Y';
+                        pinArr = sub_arr[0];
+                        recordDtArr = sub_arr[1];
+                        flag = sub_arr[2];
+                        headerIdArr = sub_arr[4];
+                        // await updateInfoSummary(flag, headerIdArr, pinArr, recordDtArr, param);
+                    }
+                    if (param === keyPath.TR) {
+                        sub_arr[3] = 'Y';
+                        pinArr = sub_arr[0];
+                        recordDtArr = sub_arr[1];
+                        flag = sub_arr[3];
+                        headerIdArr = sub_arr[5];
+                        // await updateInfoSummary(flag, headerIdArr, pinArr, recordDtArr, param);
                     }
                 }
             }
-          
-            //update headerId and Tr_flag
-            // await updateFlag(pin_arr, flag , headerId, recordDt)
         }
-    }
-    //  console.log(pin_arr)
-    // //insert TR before SL
-    // if (sl_flag === 'N' && tr_flag === 'Y') {
-    //     let data_update;
-    //     for (let x = 0; x < pin.length; x++) {
-    //         data_update = await getSummaryCheck(pin[x]);
-    //         if (data_update !== undefined) {
-    //             for (let t = 0; t < arr.length; t++) {
-    //                 let a = arr[t];
-    //                 if (a[0] === data_update.ssn) {
-    //                     a[2] = 'Y';//sl flag
-    //                     result.flag = a[2];
-    //                     result.pin = data_update.ssn;
-    //                     result.headerId = data_update.headerId;
-    //                 }
-    //             }
-    //         }
-    //         await updateFlag(result)
-    //     }
-    // }
-    await updateFlag(pin_arr, flag , headerId, recordDt)
-    console.log('update to info_summary success')
+
+        let end_update = new Date().getTime();
+        let time_update = end_update - start_update;
+        let second_update = convertMS(time_update)
+        console.log('insert and update success on ' + second_update + ' second');
+
+        //move .txt.proc and .sync.proc to archire folder (ไฟล์หลัก) 
+        let syncProc = getPath(param) + filename + '.sync.proc';
+        moveFile(param, filepath)//move file .txt.proc
+        moveFile(param, syncProc)//move file .sync.proc
+
+        //ทำ auto insert กรณีวัน off
+        console.log('auto inserting .....')
+        for (let index = 0; index < pin_query_date.length; index++) {
+            let auto_insert = await getDate(pin_query_date[index]);
+        }
+        console.log('auto insert success');
+    });
 }
 
 function mapToArraySummary(pin, recordDt, headerId, param) {
@@ -474,15 +490,24 @@ function mapToArraySummary(pin, recordDt, headerId, param) {
     sum_flag = 'N';
     sum_startDt = today_dt;
     sum_endDt = today_dt;
-    if (param == 'SL') {
+    //กรณี SL มาก่อน TR
+    if (param == keyPath.SL) {
         sl_headerId = headerId;
         sl_flag = 'Y';
         tr_flag = 'N';
     }
-    else if (param == 'TR') {
+    //กรณี TR มาก่อน SL
+    else if (param == keyPath.TR) {
         tr_headerId = headerId;
         sl_flag = 'N';
         tr_flag = 'Y';
+    }
+    //กรณีเป็นวัน off
+    else if (param == 'auto_insert') {
+        sl_headerId = null;
+        tr_headerId = null;
+        sl_flag = 'N';
+        tr_flag = 'N';
     }
     return [
         pin, recordDt, sl_flag, tr_flag, sl_headerId, tr_headerId, sum_flag, sum_startDt, sum_endDt
@@ -494,7 +519,7 @@ function readInSplit(filepath, param, headerId) {
     let arr = [];
     return new Promise(async (resolve, reject) => {
         const promises = []
-        await csv({
+        await csv({//read data from text file to json object
             noheader: true,
             delimiter: ["|"]
         }).fromFile(filepath)
@@ -507,12 +532,13 @@ function readInSplit(filepath, param, headerId) {
                     return
                 }
                 Promise.all(promises).then(result_obj => {
-                    resolve(obj)
+                    resolve(obj)//return obj ofthis function
                 })
             })
     })
 }
 
+//function for split array to sub array
 function chunk(arr, len) {
     var chunks = [],
         i = 0,
@@ -534,75 +560,198 @@ function moveFile(param, filepath) {
         fs.rename(newPath, name, function (err) {
         })
     })
+
+    let end_process = new Date().getTime();
+    let time = end_process - start_process;
+    let second = convertMS(time)
+    console.log('all process success on ' + second + ' second')
 }
 
+//function to insert data from SL,TR to info_summary_check table
 async function createSummaryCheck(obj) {
-    let insertData = pgFormat('INSERT INTO public.info_summary_check (pin, record_dt, sl_flag, tr_flag, sl_header_id, tr_header_id, gen_sum_flag, gen_sum_start_dt, gen_sum_end_dt) VALUES %L', obj);
+    let insertData = pgFormat('INSERT INTO public.info_summary_check (pin, record_dt, sl_flag, tr_flag, sl_header_id, tr_header_id, gen_sum_flag, gen_sum_start_dt, gen_sum_end_dt) VALUES (%L)', obj);
+
     (async () => {
         var client = await pool.connect()
         try {
             var result = await client.query(insertData)
         } finally {
-            client.release()
+            client.release();
         }
     })().catch(e => console.error(e.message, e.stack))
 }
 
-function updateFlag(pin , flag, headerId, recordDt){
-    let updateData = pgFormat('UPDATE public.info_summary_check SET tr_flag = %L , tr_header_id = %L WHERE pin = %L AND record_dt = %L', flag, headerId, pin, recordDt);
+//function for update sl_header tr_header and tr_flag sl_flagin info_summary_check
+async function updateInfoSummary(flag, headerId, pin, recordDt, param) {
 
-    console.log(updateData)
+    if (param === keyPath.SL) {
+        let updateData = pgFormat('UPDATE public.info_summary_check SET sl_flag = %L , sl_header_id = %L WHERE pin = %L AND record_dt = %L', flag, headerId, pin, recordDt);
+        (async () => {
+            var client = await pool.connect()
+            try {
+                var result = await client.query(updateData)
+            } finally {
+                client.release()
+            }
+        })().catch(e => console.error(e.message, e.stack))
+    }
+
+    if (param === keyPath.TR) {
+        // console.log(headerId)
+        let updateData = pgFormat('UPDATE public.info_summary_check SET tr_flag = %L , tr_header_id = %L WHERE pin = %L AND record_dt = %L', flag, headerId, pin, recordDt);
+        (async () => {
+            var client = await pool.connect()
+            try {
+                var result = await client.query(updateData)
+            } finally {
+                client.release()
+            }
+        })().catch(e => console.error(e.message, e.stack))
+    }
+
+}
+
+//function for update sl_header in info_summary_check
+async function updateHeaderId(headerId, pin, recordDt) {
+    let updateData = pgFormat('UPDATE public.info_summary_check SET sl_header_id = %L WHERE pin = %L AND record_dt = %L', headerId, pin, recordDt);
+
     (async () => {
         var client = await pool.connect()
         try {
             var result = await client.query(updateData)
         } finally {
             client.release()
+            // checkInsertSummary = true;
         }
     })().catch(e => console.error(e.message, e.stack))
 }
 
-const getSummaryCheck = async (req ,res) => {
+//function to query ssn, header_id and schedule_date form sl_detail,tr_detail 
+//return release ssn , schedule_date and header_id
+const getDetail = async (pin, recordDt, param) => {
     let result = {};
-    return await modelTrDetail.
-        findAll({
-            where: {
-                ssn: req,
-            },
-            include: [{
-                all: true
-            }], raw: true,
-        }).then(res => {
-            for (let i = 0; i < res.length; i++) {
-                result.ssn = res[i].ssn;
-                result.headerId = res[i].headerId
-                result.schedule_date = res[i].schedule_date;
-                return result;
-            }
+    let formatSQL = "'YYYY-MM-DD HH24:MI:ss'";
+    if (param === keyPath.SL) {
+        let selectData = pgFormat('SELECT ssn, header_id, TO_CHAR(schedule_date, ' + formatSQL + ') FROM public.tx_sl_detail WHERE ssn IN (%L) AND schedule_date IN (%L)', pin, recordDt);
+
+        return new Promise(async (resolve, reject) => {
+            (async () => {
+                var client = await pool.connect()
+                try {
+                    await client.query(selectData).then(async res => {
+                        res = JSON.stringify(res.rows)
+                        let obj = JSON.parse(res)
+                        let pin = [], recordDt = [], headerId = [];
+
+                        result.pin = obj[obj.length - 1].ssn
+                        result.recordDt = obj[obj.length - 1].to_char
+                        result.headerId = obj[obj.length - 1].header_id
+                        resolve(result)
+                    })
+                } finally {
+                    client.release()
+                }
+            })().catch(e => console.error(e.message, e.stack))
         })
+    }
+    if (param === keyPath.TR) {
+        let selectData = pgFormat('SELECT ssn, header_id, TO_CHAR(schedule_date, ' + formatSQL + ') FROM public.tx_tr_detail WHERE ssn IN (%L) AND schedule_date IN (%L)', pin, recordDt);
+
+        return new Promise(async (resolve, reject) => {
+            (async () => {
+                var client = await pool.connect()
+                try {
+                    await client.query(selectData).then(async res => {
+                        res = JSON.stringify(res.rows)
+                        let obj = JSON.parse(res)
+                        let pin = [], recordDt = [], headerId = [];
+
+                        result.pin = obj[obj.length - 1].ssn
+                        result.recordDt = obj[obj.length - 1].to_char
+                        result.headerId = obj[obj.length - 1].header_id
+                        resolve(result)
+                    })
+                } finally {
+                    client.release()
+                }
+            })().catch(e => console.error(e.message, e.stack))
+        })
+    }
+
 }
 
+//function for get date in this month to auto insert process
+async function getDate(pin) {
+    let now = new Date();//current time
+    //current date
+    // let firstDay = new Date(now.getFullYear(), now.getMonth(), 1);
+    // let lastDay = new Date(now.getFullYear(), now.getMonth() + 1, 0);
+    //mock Date
+    let firstDay = new Date(2017, 10, 1);
+    let lastDay = new Date(2017, 10 + 1, 0);
 
+    for (let d = firstDay; d <= lastDay; d.setDate(d.getDate() + 1)) {
+        let day = new Date(d);
+        let convertDay = moment(day).format(format);
 
-let mockPin = {
-    emp_id: '539453'
+        //query เพื่อดูว่าใน table info_summary_check และทำ auto_insert 
+        await querySummary(pin, convertDay);
+    }
 }
 
-module.exports.testQuery = async (req, res) => {
-    req = mockPin;
-    return await modelSlDetail.
+//function query data from info_summary_check for check pin and recordDt are exist ?
+async function getSummaryCheck(pin, recordDt, arr, param) {
+    let result_update = {};
+    let formatSQL = "'YYYY-MM-DD HH24:MI:ss'";
+    let selectData = pgFormat('SELECT pin, sl_header_id, tr_header_id, TO_CHAR(record_dt, ' + formatSQL + ') FROM public.info_summary_check  WHERE pin IN (%L) AND record_dt IN (%L)', pin, recordDt);
+
+    return new Promise(async (resolve, reject) => {
+        (async () => {
+            var client = await pool.connect()
+            try {
+                await client.query(selectData).then(async res => {
+                    res = JSON.stringify(res.rows)
+                    let obj = JSON.parse(res)
+                    if (obj.length === 1) {//exists in table
+                        // //update header
+                    }
+                    if (obj.length === 0) {//not exists in table
+                        //insert ค่าที่ยังไม่มีใน table info_summary_check
+                        await createSummaryCheck(arr)
+                    }
+                    resolve(result_update)
+                })
+            } finally {
+                client.release()
+            }
+        })().catch(e => console.error(e.message, e.stack))
+    })
+}
+
+//function query data from info_summary_check for auto insert process
+async function querySummary(pin, recordDt) {
+    return await modelInfoSummary.
         findAll({
             where: {
-                emp_id: req.emp_id,
+                pin: pin,
+                recordDt: recordDt
             },
             include: [{
                 all: true
             }], raw: true,
-        }).then(res => {
+        }).then(async res => {
+            if (res.length == 1) {//exist in table
+
+            }
+            if (res.length == 0) {//not exist in table
+                let obj = await mapToArraySummary(pin, recordDt, '', 'auto_insert');//map to array obj
+                let auto_insert = await createSummaryCheck(obj);//auto insert 
+            }
             return res;
         })
 }
 
+//function convert time to other unit.
 function convertMS(ms) {
     var day, hour, minute, second;
     second = Math.floor(ms / 1000);
@@ -614,3 +763,80 @@ function convertMS(ms) {
     hour = hour % 24;
     return second;
 };
+
+let mockList = [
+    { pin: '80000001', ssn: '31001' },//correct 
+    { pin: '80500002', ssn: '31002' },//correct
+    { pin: '8000003', ssn: '31003' },
+    { pin: '80000004', ssn: '31004' },//correct
+    { pin: '80100005', ssn: '31005' },//correct
+    { pin: '80300006', ssn: '31006' },
+    { pin: '80200007', ssn: '31007' },
+]
+
+let ssnToFind = ['31002', '1', '31003', '31004']
+
+let prefix = {
+    shopPIN: /^(800|801)[0-9]{5}/,
+    tmpPIN: /^(80)5[0-9]{5}/
+}
+
+const testMapPIN = async (list, ssn) => {
+    // list = mockList;
+    // ssn = ssnToFind;
+    let newListArray = [];
+    console.log(list)
+    //loop for check pattern of pin is coreect ?
+    for (let i = 0; i < list.length; i++) {
+        let checkShop = prefix.shopPIN.test(list[i].pin);
+        let checkTmp = prefix.tmpPIN.test(list[i].pin);
+        if (checkShop) {
+            newListArray.push(list[i])
+        }
+        if (checkTmp) {
+            newListArray.push(list[i])
+        }
+        if (!checkShop && !checkTmp) {
+        }
+    }
+
+    for (let j = 0; j < ssn.length; j++) {
+        let obj = newListArray.find(array => array.ssn === ssn[j]);//map pin in list by ssn
+        if (obj != undefined) {
+            // console.log(obj);
+        }
+
+    }
+}
+
+//function query ssn to create mockup PIN
+module.exports.querySSN = async (req, res) => {
+    let obj = {};
+    let ssnArr = [];
+    let list = [];
+    return await modelInfoSummary.
+        findAll({
+            include: [{
+                all: true
+            }], raw: true,
+        }).then(res => {
+            console.log(res.length)
+            for (let i = 0; i < res.length; i++) {
+                if (!ssnArr.includes(res[i].pin)) {
+                    ssnArr.push(res[i].pin)
+                    if (i % 2 === 0) {
+                        obj.pin = '8000000' + i;
+                        obj.ssn = res[i].pin;
+                    }
+                    else {
+                        obj.pin = '8050000' + i;
+                        obj.ssn = res[i].pin;
+                    }
+                }
+            } console.log(list)
+                    return list;
+            //   return list;
+
+        })
+
+}
