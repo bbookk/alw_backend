@@ -1,7 +1,7 @@
 /* eslint new-cap: "off", global-require: "off" */
-
+const moment = require('moment');
 module.exports = (sequelize, DataTypes) => {
-     const InfoAccess = sequelize.define('InfoAccess', {
+    const InfoAccess = sequelize.define('InfoAccess', {
         accessInfoId: {
             type: DataTypes.INTEGER,
             field: 'access_info_id',
@@ -22,12 +22,18 @@ module.exports = (sequelize, DataTypes) => {
         lastLoginDt: {
             type: DataTypes.DATE,
             field: 'last_login_dt',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('lastLoginDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         },
         firstLoginDt: {
             type: DataTypes.DATE,
             field: 'first_login_dt',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('firstLoginDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         },
         createBy: {
             type: DataTypes.STRING(20),
@@ -37,7 +43,10 @@ module.exports = (sequelize, DataTypes) => {
         createDt: {
             type: DataTypes.DATE,
             field: 'create_dt',
-            allowNull: false
+            allowNull: false,
+            get: function () {
+                return moment.utc(this.getDataValue('createDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         },
         updateBy: {
             type: DataTypes.STRING(20),
@@ -47,14 +56,17 @@ module.exports = (sequelize, DataTypes) => {
         updateDt: {
             type: DataTypes.DATE,
             field: 'update_dt',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('updateDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         }
     }, {
-        schema: 'public',
-        tableName: 'info_access',
-        timestamps: false
-    });
-     return InfoAccess
+            schema: 'public',
+            tableName: 'info_access',
+            timestamps: false
+        });
+    return InfoAccess
 };
 
 // module.exports.initRelations = () => {
@@ -62,7 +74,7 @@ module.exports = (sequelize, DataTypes) => {
 
 // };
 
-module.exports.createx = (req,res,model) => {
+module.exports.createx = (req, res, model) => {
     console.log('xxxx')
     console.log(model)
     console.log(req.body)
@@ -77,6 +89,6 @@ module.exports.createx = (req,res,model) => {
         updateBy: req.body.updateBy,
         updateDt: req.body.updateDt,
     }).then(todo => res.status(201).send(todo))
-        .catch(error => res.status(400).send(error)); 
+        .catch(error => res.status(400).send(error));
 
 };

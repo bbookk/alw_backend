@@ -42,6 +42,11 @@ const infoScheduleController = require('./info-schedule');
 const infoUsedQuotaController = require('./info-used-quota');
 const infoActivityController = require('./info-activity');
 
+/**
+     * Employee
+     */
+const employeeController = require('./employee');
+
 module.exports = {
   /**
    * Info Controller
@@ -82,4 +87,9 @@ module.exports = {
   txAvayaPinHeaderController,
   txActivityDetailController,
   txActivityHeaderController,
-};
+
+  /**
+     * Employee
+     */
+    employeeController,
+  };

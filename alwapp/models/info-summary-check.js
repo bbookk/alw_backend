@@ -1,5 +1,5 @@
 /* eslint new-cap: "off", global-require: "off" */
-
+const moment = require('moment');
 module.exports = (sequelize, DataTypes) => {
     const InfoSummaryCheck = sequelize.define('InfoSummaryCheck', {
         summaryCheckId: {
@@ -17,7 +17,10 @@ module.exports = (sequelize, DataTypes) => {
         recordDt: {
             type: DataTypes.DATE,
             field: 'record_dt',
-            allowNull: false
+            allowNull: false,
+            get: function () {
+                return moment.utc(this.getDataValue('recordDt')).add(7, 'hours').format('YYYY-MM-DD');
+            }
         },
         slFlag: {
             type: DataTypes.CHAR(1),
@@ -47,12 +50,18 @@ module.exports = (sequelize, DataTypes) => {
         genSumStartDt: {
             type: DataTypes.DATE,
             field: 'gen_sum_start_dt',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('genSumStartDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         },
         genSumEndDt: {
             type: DataTypes.DATE,
             field: 'gen_sum_end_dt',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('genSumEndDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         }
     }, {
             schema: 'public',
@@ -60,7 +69,7 @@ module.exports = (sequelize, DataTypes) => {
             timestamps: false
         });
 
-        return InfoSummaryCheck;
+    return InfoSummaryCheck;
 };
 
 module.exports.initRelations = () => {

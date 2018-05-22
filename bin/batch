@@ -1,0 +1,15 @@
+const http = require('http');
+const app = require('../batch'); // The express app we just created
+ console.log("process.env.PORT"+process.env.PORT)
+const port = parseInt(process.env.PORT, 10) || 8080;
+app.set('port', port);
+
+/**
+ * Initialise log4js first, so we don't miss any log messages
+ */
+var env = process.env.NODE_ENV || 'development';
+var log4js = require('log4js');
+log4js.configure(require('../alwapp/config/batch-log4js.json')[env]);
+
+const server = http.createServer(app);
+server.listen(port);

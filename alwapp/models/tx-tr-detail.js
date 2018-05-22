@@ -1,5 +1,5 @@
 /* eslint new-cap: "off", global-require: "off" */
-
+const moment = require('moment');
 module.exports = (sequelize, DataTypes) => {
     const TxTrDetail = sequelize.define('TxTrDetail', {
         detailId: {
@@ -43,7 +43,10 @@ module.exports = (sequelize, DataTypes) => {
         scheduleDate: {
             type: DataTypes.DATE,
             field: 'schedule_date',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('scheduleDate')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         },
         time_zone: {
             type: DataTypes.STRING(50),
@@ -59,18 +62,27 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             field: 'start_dt',
             timezone: '+07:00',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('startDt')).add(7, 'hours').format('HH:mm');
+            }
         },
         stopDt: {
             type: DataTypes.DATE,
             field: 'stop_dt',
             timezone: '+07:00',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('stopDt')).add(7, 'hours').format('HH:mm');
+            }
         },
         createDt: {
             type: DataTypes.DATE,
             field: 'create_dt',
-            allowNull: true
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('createDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+            }
         },
         createBy: {
             type: DataTypes.STRING(20),

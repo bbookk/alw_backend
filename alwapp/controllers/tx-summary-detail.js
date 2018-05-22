@@ -13,7 +13,7 @@ module.exports = {
   /**
    * `Summary-detailController.list()`
    */
-  list: async function (req, res) {
+  list: async function (request, reply) {
     return await model.
       findAll({
         where: {
@@ -29,8 +29,8 @@ module.exports = {
   /**
    * `Summary-detailController.show()`
    */
-  show: function (req, res) {
-    return res.json({
+  show: function (request, reply) {
+    return reply({
       todo: 'show() is not implemented yet!'
     });
   },
@@ -39,8 +39,8 @@ module.exports = {
   /**
    * `Summary-detailController.create()`
    */
-  create: function (req, res) {
-    return res.json({
+  create: function (req, reply) {
+    return reply({
       todo: 'create() is not implemented yet!'
     });
   },
@@ -49,8 +49,8 @@ module.exports = {
   /**
    * `Summary-detailController.update()`
    */
-  update: function (req, res) {
-    return res.json({
+  update: function (request, reply) {
+    return reply({
       todo: 'update() is not implemented yet!'
     });
   },
@@ -59,13 +59,13 @@ module.exports = {
   /**
    * `Summary-detailController.remove()`
    */
-  remove: function (req, res) {
+  remove: function (request, reply) {
     return res.json({
       todo: 'remove() is not implemented yet!'
     });
   },
 
-  getSummaryDaily: function (req, res) {
+  getSummaryDaily: function (request, reply) {
     // let obj = {
     //   name: req.name,
     //   surname: req.surname,
@@ -90,7 +90,7 @@ module.exports = {
 
     // }
 
-    return res.json({
+    return reply({
 
       "header": {
         "status": "S",
@@ -239,8 +239,8 @@ module.exports = {
     });
 
   },
-  getSummaryAdjust: function (req, res) {
-    return res.json({
+  getSummaryAdjust: function (request, reply) {
+    return reply({
       "header": {
         "status": "S",
         "resp_dttm": "2016-08-12T00:00:00+00:00"
@@ -328,8 +328,8 @@ module.exports = {
       }
     })
   },
-  getApproveAllowanceReport: function (req, res) {
-    return res.json({
+  getApproveAllowanceReport: function (request, reply) {
+    return reply({
       "header": {
         "status": "S",
         "resp_dttm": "2016-08-12T00:00:00+00:00"
@@ -424,8 +424,8 @@ module.exports = {
 
     })
   },
-  getSummaryOrganization: function (req, res) {
-    return res.json({
+  getSummaryOrganization: function (request, reply) {
+    return reply({
       "header": {
         "status": "S",
         "resp_dttm": "2016-08-12T00:00:00+00:00"
@@ -580,8 +580,8 @@ module.exports = {
       }
     })
   },
-  getSummarySupervisor: function (req, res) {
-    return res.json({
+  getSummarySupervisor: function (request, reply) {
+    return reply({
       "header": {
         "status": "S",
         "resp_dttm": "2016-08-12T00:00:00+00:00"
@@ -719,11 +719,11 @@ module.exports = {
       }
     })
   },
-  getSummaryMonthly: function (req, res) {
-    if (isNotEmpty(req.query.Type)) {
+  getSummaryMonthly: function (request, reply) {
+    if (isNotEmpty(request.query.Type)) {
       if (req.query.Type.toUpperCase() == 'agent'.toUpperCase()) {
         console.log('agent')
-        return res.json({
+        return reply({
           "header": {
             "status": "S",
             "resp_dttm": "2016-08-12T00:00:00+00:00"
@@ -837,9 +837,9 @@ module.exports = {
             ]
           }
         })
-      } else if (req.query.Type.toUpperCase() == 'supervisor'.toUpperCase()) {
+      } else if (request.query.Type.toUpperCase() == 'supervisor'.toUpperCase()) {
         console.log('Supervisor')
-        return res.json({
+        return reply({
           "header": {
             "status": "S",
             "resp_dttm": "2016-08-12T00:00:00+00:00"

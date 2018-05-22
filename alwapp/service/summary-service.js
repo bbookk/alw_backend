@@ -1,47 +1,65 @@
-const moment = require('moment');
+/*
+   model
+*/
 const infoActivity = require('../models').InfoActivity
 const txSlDetail = require('../models').TxSlDetail
 const txTrDetail = require('../models').TxTrDetail
 const txSummaryDetail = require('../models').TxSummaryDetail
+const infoSummaryCheck = require('../models').InfoSummaryCheck
+const Op = require('../models').Sequelize.Op;
+
+/*
+   dependency
+*/
+const moment = require('moment');
+const arrayToTxtFile = require('array-to-txt-file')
+
+/*
+   service
+*/
+const log = require('./log-service')
+
+/*
+   class
+*/
+const KEYWORD = require('../class').Constant
+
 
 const condShiftTime = '13:00:00|06:30:00'
 const shiftStart = condShiftTime.split('|')[0]
 const shiftEnd = condShiftTime.split('|')[1]
-
 const condTransportTime = '14:00:00|20:00:00'
 const transportStart = condTransportTime.split('|')[0]
 const transportEnd = condTransportTime.split('|')[1]
-
 const format = 'HH:mm:ss'
 const formatHour = 'HH:mm';
-
 const standardWorkTime = 8;
 
-const OT = { OT_1: 1, OT1_5: 1.5, OT_3: 3 }
 
 
-//ON คือมาทำงานปกติ 
-//OFF คือวันหยุด 
-//Business Leave(BL)
-//Vacation Leave(VL)
-//BirthDay Leave(BD)
-//Compensate Leave(CL)
-//Sick Leave(SL)
-const attandace = { ot: 'OT', otCom: 'OTCom', autoOT: 'AutoOT' }
-const work = { on: 'ON', off: 'OFF' }
-const leave = { bl: 'BL', vl: 'VL', bd: 'BD', cl: 'CL', sl: 'SL' }
+let objbyCond = {
+    schedule: {},
+    actualClock: {},
+    flagPaid: {},
+    objHour: {},
+    isLeave: false,
+    objTime: {},
+    actualClockOT: {},
+    isOTCom: false,
+    is2OT: false,
+    OT: { OT_1: '', OT1_5: '', OT_3: '' }
 
-const LEAVE_KEYWORD = [
-    { ACTIVITY: 'Business Leave', KEY: 'BL' },
-    { ACTIVITY: 'Maternity Leave', KEY: 'BL' },
-    { ACTIVITY: 'Military Leave', KEY: 'BL' },
-    { ACTIVITY: 'Priesthood Leave', KEY: 'BL' },
-    { ACTIVITY: 'Vacation', KEY: 'VL' },
-    { ACTIVITY: 'Sick', KEY: 'SL' }
-]
+}
+
+let objID = {
+    pin: '',
+    txDetailSLId: '',
+    txDetailTRId: ''
+}
+
 
 let recordType = (type) => {
-    if (type == 'on')
+    if (type == 'ON')
         return {
             txDetailSLId: '',
             txDetailTRId: '',
@@ -61,11 +79,14 @@ let recordType = (type) => {
             ot30: '0.00',
             recordDate: '',
             recordMonth: '',
+            useFlag: 'N',
             remark: '',
+            lateTime: '',
+            lostTime: '',
             createBy: 'Batch',
             createDt: '',
         }
-    else if (type == 'off')
+    else if (type == 'OFF')
         return {
             txDetailSLId: '',
             txDetailTRId: '',
@@ -85,11 +106,14 @@ let recordType = (type) => {
             ot30: '0.00',
             recordDate: '',
             recordMonth: '',
+            useFlag: 'N',
             remark: 'Off',
+            lateTime: '',
+            lostTime: '',
             createBy: 'Batch',
             createDt: '',
         }
-    else if (type == 'lv')
+    else if (type == 'LV')
         return {
             txDetailSLId: 'x',
             txDetailTRId: '',
@@ -101,6 +125,60 @@ let recordType = (type) => {
             actualClockinDt: '',
             actualClockoutDt: '',
             recordType: 'x',
+            shiftFlag: false,
+            transportFlag: false,
+            ot10: '0.00',
+            ot15: '0.00',
+            ot30: '0.00',
+            workHour: '',
+            recordDate: '',
+            recordMonth: '',
+            useFlag: 'N',
+            remark: 'x',
+            lateTime: '',
+            lostTime: '',
+            createBy: 'Batch',
+            createDt: '',
+        }
+    else if (type == 'AutoOT')
+        return {
+            txDetailSLId: '',
+            txDetailTRId: '',
+            pin: 'x',
+            scheduleStartDt: '',
+            scheduleEndDt: '',
+            otStartDt: '',
+            otEndDt: '',
+            actualClockinDt: '',
+            actualClockoutDt: '',
+            recordType: 'AutoOT',
+            shiftFlag: '',
+            transportFlag: '',
+            ot10: '8.00',
+            ot15: '0.00',
+            ot30: '0.00',
+            workHour: '',
+            recordDate: '',
+            recordMonth: '',
+            useFlag: 'N',
+            remark: 'x',
+            createBy: 'Batch',
+            lateTime: '',
+            lostTime: '',
+            createDt: '',
+        }
+    else if (type == '2OT')
+        return {
+            txDetailSLId: '',
+            txDetailTRId: '',
+            pin: 'x',
+            scheduleStartDt: '',
+            scheduleEndDt: '',
+            otStartDt: 'x',
+            otEndDt: 'x',
+            actualClockinDt: '',
+            actualClockoutDt: '',
+            recordType: 'x',
             shiftFlag: '',
             transportFlag: '',
             ot10: '0.00',
@@ -109,101 +187,116 @@ let recordType = (type) => {
             workHour: '',
             recordDate: '',
             recordMonth: '',
-            remark: 'x',
+            useFlag: 'N',
+            remark: '',
             createBy: 'Batch',
+            lateTime: '',
+            lostTime: '',
             createDt: '',
         }
 }
-let employeeScheList = []
-let mapTR = new Map();
+
 
 module.exports.processSummaryDetail = async (req, res) => {
 
-    //getHour('12:39', '15:20')
-
-    console.log('xxaaass', activityHourPaid('12:17', '14:35', '00:00:00'))
-
-    await mapData2Obj(req, res)    // getdata and map object to new format
+    //let summaryCheck = await getInfoSummaryCheckModel();   // query record for summary detail 
+    //summaryCheck.forEach(async infoSummary => {
+    infoSummary = {
+        trFlag: 'Y',
+        slFlag: 'Y'
+    }
+    let employeeScheList = await mapData2Obj(infoSummary); // set data to obj by one record
     let listMstActivity = await getActivityInfo('ALL');
+
+
     let sumaryDetailObj = []   // array for insert to DB
+
+    let isHolidayFlag = await isHoliday(false)
     console.log('employeeScheList length:', employeeScheList.length)
-    employeeScheList.forEach(async obj => {
-        let grupTypeSchedule = [];
-        for (let sl of obj.activitySL) {   //หา group type จาก SL เก็บใน Array
-            for (let mstAct of listMstActivity) {
-                if (sl.activityName.toUpperCase() === mstAct.activityName.toUpperCase()) {
-                    grupTypeSchedule.push(mstAct.groupType)   // get grouptype of day
-                    break
-                }
-            }
+    console.log('employeeScheList:', employeeScheList)
+    if (isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) {
+        /* Case don’t have TR 
+           such as case leave , case special Activity
+        */
+
+        /* keep groupType for Condition */
+        let grupTypeSchedule = findGrupType(employeeScheList, listMstActivity);
+        console.log('grupTypeSchedule:', grupTypeSchedule)
+
+        let findIndexSpecial = grupTypeSchedule.findIndex(e => { return e == 'Special' })
+        let findIndexWork = grupTypeSchedule.findIndex(e => { return e == 'Work' })
+        let findIndexLeave = grupTypeSchedule.findIndex(e => { return e == 'Leave' })
+        if (findIndexWork >= 0) {  // still update SL,TR
+            return false
+        }
+        else if (findIndexLeave >= 0 && findIndexWork < 0) { //case leave all day 
+            console.log('case Leave')
+            let sumaryDetailObj = await setData2condLeave(obj.activitySL, true)
+            let scheduleDate = moment(obj.scheduleDate).format('YYYY-MM-DD');
+            sumaryDetailObj.recordDate = scheduleDate
+            sumaryDetailObj.pin = isNotEmpty(employeeScheList.pin) ? employeeScheList.pin : ''
+            sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList.headerSL) ? employeeScheList.headerSL : ''
+            saveData2DB(sumaryDetailObj)
+        }
+        else if (findIndexSpecial >= 0 && findIndexWork < 0) { // case special all day 
+            console.log('Case Special activity All Day')
+            let sumaryDetailObj = setData2condAllDaySpecial(obj.activitySL, obj.overlapTime)
+            let scheduleDate = moment(employeeScheList.scheduleDate).format('YYYY-MM-DD');
+            sumaryDetailObj.recordDate = scheduleDate
+            sumaryDetailObj.pin = isNotEmpty(employeeScheList.pin) ? employeeScheList.pin : ''
+            sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList.headerSL) ? employeeScheList.headerSL : ''
+            saveData2DB(sumaryDetailObj)
+            // console.log('Case Special activity All Day record:', sumaryDetailObj)
         }
 
-        console.log('group activity:' + grupTypeSchedule)
 
-        if (isNotEmpty(obj.activityTR) && isNotEmpty(obj.activitySL)) {
-            let result = await processWithCond(obj.activitySL, obj.activityTR, obj.overlapTime, grupTypeSchedule, listMstActivity);  //return ot hour and record type  and hour and late 
-            let model = getNewObjbyType('ModelSummaryDetail');
-            result.pin = obj.pin
-            result.txDetailSLId = obj.headerSL
-            result.txDetailTRId = obj.headerTR
-            console.log('result:', result)
-            // sumaryDetailObj.push(result)
-        } else { //case leave
+    } else if (!isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) { // case off
 
-            if (isNotEmpty(obj.activitySL) && !isNotEmpty(obj.activityTR)) {
-
-                let listMstActivityLeave = await getActivityInfo('Leave');
-                let listMstActivitySpecial = await getActivityInfo('Special');
-                let findIndexSpecial = grupTypeSchedule.findIndex(e => { return e == 'Speacial' })
-
-                //let isLeave = false;
-                // obj.activitySL.forEach(sl => {
-                //     if (!isLeave) {
-                //         listMstActivityLeave.forEach(mstLeave => {
-                //             if (mstLeave.activity == sl.activity) { 
-                if (findIndexSpecial < 0) {//case leave 
-                    console.log('case Leave')
-                    let list = setData2condLeave(obj.activitySL, obj.overlapTime)
-                    list.pin = obj.pin
-                    list.txDetailSlId = obj.headerSL
-                    sumaryDetailObj.push(list)
-                    console.log('case Leave', sumaryDetailObj)
-                }
-                //             }
-                //         })
-                //     }
-                // })
-
-                // if (!isLeave) {  // case special 
-                // listMstActivitySpecial.forEach(mstSpecial => {
-                //     if (mstSpecial.activity == sl.activity) {
-                else if (findIndexSpecial > 0) {// case special all day 
-                    console.log('Case Special activity All Day')
-                    let list = setData2condAllDaySpecial(obj.activitySL, obj.overlapTime)
-                    list.pin = obj.pin
-                    list.txDetailSlId = obj.headerSL
-                    sumaryDetailObj.push(list)
-                    console.log('case Leave', sumaryDetailObj)
-                }
-                //     }
-                // })
-                // }
-            }
+        if (isHolidayFlag) {
+            /* dayOff == Holiday => AutoOT , one record by RecordType = 'AutoOT' */
+            console.log('Auto OT')
+            return setData2DB('AutoOT', '', setID(employeeScheList))
+        } else {
+            /* dayOff and !Holiday => OFF , one record by RecordType = 'AutoOT' */
+            console.log('Day OFF')
+            return setData2DB('OFF', '', setID(employeeScheList))
         }
-    })
+    } else if (isTrue(infoSummary.slFlag) && isTrue(infoSummary.trFlag)) {
+
+        /* keep groupType for Condition */
+        let grupTypeSchedule = findGrupType(employeeScheList, listMstActivity);
+        console.log('grupTypeSchedule:', grupTypeSchedule)
+
+        employeeScheList.forEach(async obj => {
+            /* Case have TR and SL */
+            if (isNotEmpty(obj.activityTR) && isNotEmpty(obj.activitySL)) {
+                obj.activityTR = mapTRbySLDaily(obj.activitySL, obj.activityTR);   // new Array TR by Schedule SL
+                //let isLeave = await isLeaveActivity(obj.activitySL)
+                let result = await processWithCond(obj.activitySL, obj.activityTR, obj.overlapTime, grupTypeSchedule, listMstActivity, setID(obj));  //return ot hour and record type  and hour and late 
+                //let model = getNewObjbyType('ModelSummaryDetail');
+                console.log('result:', result)
+                // sumaryDetailObj.push(result)
+                // res.status(200).send(sumaryDetailObj)
+            }
+        })
+    }
+    //})// getdata and map object to new format
+
+
 
     // txSummaryDetail.create(model);
     // if (!isEmptyArray(sumaryDetailObj)) {
     //     saveData2DB(sumaryDetailObj)
     // }
 
-    console.log('xczczxc')
-    console.log('final sumaryDetailObj:', sumaryDetailObj)
-    res.status(200).send('xxx')
+    console.log('after calculate')
+
+    res.status(200).send('2313123')
+
 }
 
 
-async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, listMstActivity) {
+async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, listMstActivity, objID) {
 
     // sortTime(listSL, overlapTime);   //sort asc
     // sortTime(listTR, overlapTime);   //sort asc
@@ -214,7 +307,8 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
         dayOff: false,
         work: false,
         compensate: false,
-        isActSpecial: false
+        isActSpecial: false,
+        isLeave: await isLeaveActivity(listSL)
     }
     console.log('cond.isHoliday:' + cond.isHoliday)
     grupTypeSchedule.forEach(e => {
@@ -240,51 +334,136 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
     let flagPaid = hasShiftOrTransport(listSL, listTR)    // คำนวนค่ากะ ค่ารถ return เป็น obj flag
 
 
-    if (cond.isHoliday && cond.work) { //เป็นวันหยุด แต่มี sl มาทำงาน
-        //ot com 
+    if (cond.isHoliday && cond.work) {
+        /* Holiday+Schedule Work , one record by RecordType = 'OTCOM' */
         console.log('OT Compensate')
-        let tr = splitActivityTRBySL(listSL, listTR, 'Work', listMstActivity)
-        isOTCompensate(listSL, listTR)
-    }
-    if (cond.scheOT == 2 && !cond.work) {  //เป็นวันหยุด และตรงกับนักขัติฤกษ์
-        //auto ot 
-        console.log('Auto OT')
-        let tr = splitActivityTRBySL(listSL, listTR, 'Work', listMstActivity)
-        isAutoOT(listSL, listTR)
-        //เข้า case นี้ recordType จะมี record เดียว
+        if (cond.scheOT == 1 && cond.work) {      // spilt 3 case  Normal ,  Normal +OT , OT Before After 
+            /* Schedule Normal + OT, one record by RecordType = 'ON' */
+            return normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, true, objID)
+        } else if (cond.scheOT == 2 && cond.work) {
+            /* Schedule duration 2 OT , three record by RecordType = 'ON' , 'OT ก่อน' , 'OT หลัง' */
+            return duration2OT(listSL, listTR, listMstActivity, flagPaid, true, objID)
+        } else if (cond.scheOT == 0 && cond.work) {
+            /* ScheduleNormal , one record by RecordType = 'ON' */
+            return normalCond(listSL, listTR, listMstActivity, flagPaid, true, objID)
+
+        }
     }
     if (cond.scheOT == 1 && cond.work && !cond.isHoliday) {
-        console.log('Normal Overtime')
-        let schedule = await findScheduleStartEnd(listSL, 'normal')   // Schedule start - end 
-        let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity) // Actual clock in - out ,lost and late 
-        let scheduleOT = await findScheduleStartEnd(listSL, 'ot')
-        console.log('scheduleOT', scheduleOT)
-        let actualClockOT = findActualClockFromTR(scheduleOT, listTR, listMstActivity)
-        console.log('actualClockOT', actualClockOT)
-        let tr = await splitActivityTRBySL(listSL, listTR, 'OT', listMstActivity)
-        console.log('arr TR:', tr.work.length)
-        let objHour = normalWork(tr, listMstActivity, 'ot')
-        return setData2DB('on', objHour, schedule, actualClock, flagPaid, actualClockOT)
-        // rec = isNormalOvertime(listSL[index], listTR)
-        //เข้า case นี้ recordType จะมี record เดียว
+        /* Schedule Normal + OT, one record by RecordType = 'ON' */
+        return normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, false, objID)
     }
     if (cond.scheOT == 2 && cond.work && !cond.isHoliday) {
-        console.log('OT Befor After')
-        let tr = splitActivityTRBySL(listSL, listTR, '2MomentOT', listMstActivity)
-        isOverTimeBeforeAfter(listSL, listTR)
+        /* Schedule duration 2 OT , three record by RecordType = 'ON' , 'OT ก่อน' , 'OT หลัง' */
+        return duration2OT(listSL, listTR, listMstActivity, flagPaid, false, objID)
     }
     if (cond.scheOT == 0 && cond.work && !cond.isHoliday) {
-        console.log('Normal Work')
-        let schedule = await findScheduleStartEnd(listSL, 'normal')   // Schedule start - end 
-        let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity)// Actual clock in - out ,lost and late 
-        let tr = await splitActivityTRBySL(listSL, listTR, 'Work', listMstActivity) // hour
-        let objHour = normalWork(tr, listMstActivity, 'normal')
-        //let remark = toolate(schedule, tr)
-        return setData2DB('on', objHour, schedule, actualClock, flagPaid)
+        /* ScheduleNormal , one record by RecordType = 'ON' */
+        return normalCond(listSL, listTR, listMstActivity, flagPaid, false, objID)
     }
-    //let matchAct = checkActivityFromActGroup(objSL, objTR, grupTypeSchedule, listMstActivity, cond)
+}
+
+
+async function normalCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+    /* ScheduleNormal , one record by RecordType = 'ON' */
+    console.log('Normal Work')
+    let schedule = await findScheduleStartEnd(listSL, 'normal')   // Schedule start - end 
+    console.log('schedule:', schedule)
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity)// Actual clock in - out ,lost and late 
+    console.log('actualClock:', actualClock)
+    let objTime = getTimeLostOrlate(schedule, actualClock);
+
+    objbyCond.schedule = schedule
+    objbyCond.flagPaid = flagPaid
+    objbyCond.actualClock = actualClock
+    objbyCond.objTime = objTime
+    // let tr = await splitActivityTRBySL(listSL, listTR, 'Work', listMstActivity) // hour
+    // console.log('tr:', tr.work.length)
+    // let objHour = normalWork(tr, listMstActivity, 'normal')
+
+    /*  case OTCOM Normal will be get (Hour = OT*1)  */
+    if (isOTCOM) {
+        // let hour = activityHourPaid(actualClock.start, actualClock.end, hour)
+        // objbyCond.OT.OT_1 = hour
+        setData2DB('OTCOM', objbyCond, objID)
+    } else {
+        setData2DB('ON', objbyCond, objID)
+    }
+}
+
+
+async function normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+
+    console.log('Normal Overtime')
+    let schedule = await findScheduleStartEnd(listSL, 'normal')   // Schedule start - end 
+    console.log('schedule:', schedule)
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity) // Actual clock in - out ,lost and late 
+    console.log('actualClock:', actualClock)
+
+    let scheduleOT = await findScheduleStartEnd(listSL, 'ot')
+    console.log('scheduleOT', scheduleOT)
+    let actualClockOT = findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, schedule)
+    console.log('actualClockOT', actualClockOT)
+    let tr = await splitActivityTRBySL(listSL, listTR, 'OT', listMstActivity, schedule, scheduleOT)
+    console.log('arr TR:', tr.work.length)
+    let objHour = normalWork(tr, listMstActivity, 'ot', actualClock)
+
+    let objTime = getTimeLostOrlate(schedule, actualClock);  // get min - hour for case late or lost
+    objbyCond.schedule = schedule
+    objbyCond.flagPaid = flagPaid
+    objbyCond.actualClock = actualClock
+    //objbyCond.isLeave = cond.isLeave
+    objbyCond.objTime = objTime
+    objbyCond.actualClockOT = actualClockOT
+    objbyCond.objHour = objHour
+    // let tr = await splitActivityTRBySL(listSL, listTR, 'Work', listMstActivity) // hour
+    // console.log('tr:', tr.work.length)
+    // let objHour = normalWork(tr, listMstActivity, 'normal')
+
+    if (isOTCOM) {
+        setData2DB('OTCOM', objbyCond, objID)
+    } else {
+        setData2DB('ON', objbyCond, objID)
+    }
 
 }
+
+async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+    console.log('OT Befor After')
+    let schedule = await findScheduleStartEnd(listSL, 'normal') //ช่วงเวลาทำงานปกติของพนักงาน ตามไฟล์ SL
+    console.log('schedule normal:', schedule)
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity) // เวลาทำงานจริงๆของพนักงาน ตามไฟล์ SL
+    console.log('actualClock normal:', actualClock)
+    let scheduleOT = await findScheduleStartEnd(listSL, '2OT')
+    console.log('schedule ot:', scheduleOT)
+    let actualClockBefore = await findActualClockOTFromTR(scheduleOT.before, listTR, listMstActivity, schedule)
+    console.log('actualClockBefore:', actualClockBefore)
+    let actualClockAfter = await findActualClockOTFromTR(scheduleOT.after, listTR, listMstActivity, schedule)
+    console.log('actualClockAfter:', actualClockAfter)
+    let tr = await splitActivityTRBySL(listSL, listTR, '2OT', listMstActivity, schedule, scheduleOT)
+    let objHour = beforeAfterOT(tr, listMstActivity, actualClock)
+
+
+    objbyCond.schedule = schedule
+    objbyCond.flagPaid = flagPaid
+    objbyCond.actualClock = actualClock
+    //objbyCond.isLeave = cond.isLeave
+    objbyCond.objTime = objTime
+    objbyCond.actualClockOT.actualClockBefore = actualClockBefore
+    objbyCond.actualClockOT.actualClockAfter = actualClockAfter
+    objbyCond.objHour = objHour
+
+    if (isOTCOM) {
+        objbyCond.is2OT = true
+        setData2DB('OTCOM', objbyCond, objID)
+    } else {
+        objbyCond.is2OT = true
+        setData2DB('ON', objbyCond, objID)
+    }
+
+
+}
+
 
 //นำ TR มา Check เพื่อ Confirm ว่าตรงกับ SL 
 // function checkActivityFromActGroup(listSL, listTR, grupTypeSchedule, listMstActivity, cond) {     // parameter one object listSL {} , listTR{}
@@ -324,9 +503,33 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
 //         }
 //     }
 // }
+function mapTRbySLDaily(listSL, listTR) {
+    let listTRDaily = [];
+    for (let i = 0; i < listSL.length; i++) {
+        let momentActSLEnd = moment(listSL[i].end, format);// sl end
+        let momentActSLStart = moment(listSL[i].start, format);// sl start
+        //listMstActivity.forEach(e => {
+        // if (checkActivityByGrup('Work', listMstActivity, listSL[i].activityName)
+        //     || checkActivityByGrup('Meal', listMstActivity, listSL[i].activityName)) { //case work activity
+        for (let j = 0; j < listTR.length; j++) {
+            let momentActTREnd = moment(listTR[j].end, format);   // tr end
+            let momentActTRStart = moment(listTR[j].start, format);  //tr start
+            if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
+                || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
+                || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
+            ) {
+                //listAcivityTR.work.push(listTR[j])
+                listTRDaily.push(listTR[j])
+            }
+        }
+        //}
+    }
+    return listTRDaily
+
+}
 
 
-async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity) {
+async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity, schedule, scheduleOT) {
 
     let listAcivityTR = {
         work: [],
@@ -338,8 +541,8 @@ async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity) {
     }
 
     console.log('condition:', cond)
-    console.log('listSL splitActivityTRBySL:', listSL)
-    console.log('listTR splitActivityTRBySL:', listTR)
+    // console.log('listSL splitActivityTRBySL:', listSL)
+    // console.log('listTR splitActivityTRBySL:', listTR)
     if (cond == 'OT') {
         //  let listMstActivity = await getActivityInfo('ALL');
         let lastTimeSchedule
@@ -356,11 +559,16 @@ async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity) {
                 for (let j = 0; j < listTR.length; j++) {
                     let momentActTREnd = moment(listTR[j].end, format);   // tr end
                     let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                    if ((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd))
-                        && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart))) {
+                    if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
+                        || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))  // case activity momemnt overlap SL start  
+                        || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
+                    ) {
                         listAcivityTR.ot.push(listTR[j])
                     }
                 }
+                console.log('listAcivityTR.ot1', listAcivityTR.ot)
+                checkOverlapOT(schedule, scheduleOT, listAcivityTR.ot)
+                console.log('listAcivityTR.ot2', listAcivityTR.ot)
             }
             //   else if ((e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase() && e.groupType == 'Work')
             //     || (e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase() && e.groupType == 'Meal')) { //case work activity
@@ -372,7 +580,6 @@ async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity) {
                         let momentActTREnd = moment(listTR[j].end, format);   // tr end
                         let momentActTRStart = moment(listTR[j].start, format);  //tr start
                         if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
-                            //|| (momentActSLStart.isBetween(momentActTRStart, momentActTREnd || momentActSLEnd.isBetween(momentActTRStart, momentActTREnd)))
                             || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
                             || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
                         ) {
@@ -398,88 +605,102 @@ async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity) {
         }
         //console.log('listAcivityTR.work',listAcivityTR.work.splice(80,listAcivityTR.work.length-1))
         return listAcivityTR
-    } else if (cond == '2MomentOT') {
+    } else if (cond == '2OT') {  // จะมี 3-4 array (work,otbefore,otafter and special) 
 
         //  let listMstActivity = await getActivityInfo('ALL');
         let listMstActivityOT = await getActivityInfo('OT');
         let lastTimeSchedule;
 
-        let indexOTBefore;
-        let indexOTAfter;
+        // let indexOTBefore;
+        // let indexOTAfter;
         let indexOT = [];
         for (let i = 0; i < listSL.length; i++) {
-            listMstActivityOT.forEach(e => {
-                if (e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase() && e.groupType == 'OT') {
-                    indexOT.push(i)
-                    // break;
-                }
-            })
+            //listMstActivityOT.forEach(e => {
+            if (checkActivityByGrup('OT', listMstActivityOT, listSL[i].activityName)) {
+                //if (e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase() && e.groupType == 'OT') {
+                indexOT.push(i)
+                // break;
+            }
+            // })
         }
+        console.log('indexOT:', indexOT)
         let startFirst = moment(listSL[indexOT[0]].start, format);
         let startSecond = moment(listSL[indexOT[1]].start, format);
-        if (startFirst.isBefore(startSecond)) {
-            let endFirst = moment(listSL[indexOT[0]].start, format);
-            for (let j = 0; j < listTR.length; j++) {
-                let momentActTREnd = moment(listTR[j].end, format);   // tr end
-                let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                if ((endFirst.isSame(momentActTREnd) || momentActTREnd.isBefore(endFirst))
-                    && (startFirst.isSame(momentActTRStart) || momentActTRStart.isAfter(startFirst))) {
-                    listAcivityTR.otBefore.push(listTR[j])
-                }
-            }
+        // if (startFirst.isBefore(startSecond)) {  // 
+        let endFirst = moment(listSL[indexOT[0]].end, format);
+        let endSecond = moment(listSL[indexOT[1]].end, format);
 
-            let endSecond = moment(listSL[indexOT[1]].start, format);
-            for (let j = 0; j < listTR.length; j++) {
-                let momentActTREnd = moment(listTR[j].end, format);   // tr end
-                let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                if ((endSecond.isSame(momentActTREnd) || momentActTREnd.isBefore(endSecond))
-                    && (startSecond.isSame(momentActTRStart) || momentActTRStart.isAfter(startSecond))) {
-                    listAcivityTR.otAfter.push(listTR[j])
-                }
-            }
 
-        } else {
-            let endFirst = moment(listSL[indexOT[1]].start, format);
-            for (let j = 0; j < listTR.length; j++) {
-                let momentActTREnd = moment(listTR[j].end, format);   // tr end
-                let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                if ((endFirst.isSame(momentActTREnd) || momentActTREnd.isBefore(endFirst))
-                    && (startSecond.isSame(momentActTRStart) || momentActTRStart.isAfter(startSecond))) {
-                    listAcivityTR.otBefore.push(listTR[j])
-                }
-            }
+        for (let j = 0; j < listTR.length; j++) {
+            let momentActTREnd = moment(listTR[j].end, format);   // tr end
+            let momentActTRStart = moment(listTR[j].start, format);  //tr start
+            if (((endFirst.isSame(momentActTREnd) || momentActTREnd.isBefore(endFirst)) && (startFirst.isSame(momentActTRStart) || momentActTRStart.isAfter(startFirst)))
+                || (momentActTRStart.isBefore(startFirst) && (momentActTREnd.isAfter(startFirst)))   // case activity momemnt overlap SL start  
+                || (momentActTRStart.isBefore(endFirst) && momentActTREnd.isAfter(endFirst)) // case activity momemnt overlap SL end
+            ) {
 
-            let endSecond = moment(listSL[indexOT[0]].start, format);
-            for (let j = 0; j < listTR.length; j++) {
-                let momentActTREnd = moment(listTR[j].end, format);   // tr end
-                let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                if ((endSecond.isSame(momentActTREnd) || momentActTREnd.isBefore(endSecond))
-                    && (startFirst.isSame(momentActTRStart) || momentActTRStart.isAfter(startFirst))) {
-                    listAcivityTR.otAfter.push(listTR[j])
-                }
+                console.log('otBefore')
+                listAcivityTR.otBefore.push(listTR[j])
             }
-
         }
+
+        for (let j = 0; j < listTR.length; j++) {
+            let momentActTREnd = moment(listTR[j].end, format);   // tr end
+            let momentActTRStart = moment(listTR[j].start, format);  //tr start
+            if (((endSecond.isSame(momentActTREnd) || momentActTREnd.isBefore(endSecond)) && (startSecond.isSame(momentActTRStart) || momentActTRStart.isAfter(startSecond)))
+                || (momentActTRStart.isBefore(startSecond) && (momentActTREnd.isAfter(startSecond)))   // case activity momemnt overlap SL start  
+                || (momentActTRStart.isBefore(endSecond) && momentActTREnd.isAfter(endSecond)) // case activity momemnt overlap SL end
+            ) {
+                console.log('otAfter')
+                listAcivityTR.otAfter.push(listTR[j])
+            }
+        }
+        checkOverlapOT(schedule, scheduleOT.after, listAcivityTR.otAfter)
+        checkOverlapOT(schedule, scheduleOT.before, listAcivityTR.otBefore)
+        // }
+        //else {
+        // let endFirst = moment(listSL[indexOT[1]].start, format);
+        // for (let j = 0; j < listTR.length; j++) {
+        //     let momentActTREnd = moment(listTR[j].end, format);   // tr end
+        //     let momentActTRStart = moment(listTR[j].start, format);  //tr start
+        //     if ((endFirst.isSame(momentActTREnd) || momentActTREnd.isBefore(endFirst))
+        //         && (startSecond.isSame(momentActTRStart) || momentActTRStart.isAfter(startSecond))) {
+        //         listAcivityTR.otBefore.push(listTR[j])
+        //     }
+        // }
+
+        // let endSecond = moment(listSL[indexOT[0]].start, format);
+        // for (let j = 0; j < listTR.length; j++) {
+        //     let momentActTREnd = moment(listTR[j].end, format);   // tr end
+        //     let momentActTRStart = moment(listTR[j].start, format);  //tr start
+        //     if ((endSecond.isSame(momentActTREnd) || momentActTREnd.isBefore(endSecond))
+        //         && (startFirst.isSame(momentActTRStart) || momentActTRStart.isAfter(startFirst))) {
+        //         listAcivityTR.otAfter.push(listTR[j])
+        //     }
+        // }
+
+        //}
 
         // check Activity ตามช่วงเวลาของ SL
         for (let i = 0; i < listSL.length; i++) {
             let momentActSLEnd = moment(listSL[i].end, format);// sl end
             let momentActSLStart = moment(listSL[i].start, format);// sl start
             let activityList = []
-
-            listMstActivity.forEach(e => {
-                if ((e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase()
-                    && e.groupType == 'Work') || (e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase() && e.groupType == 'Meal')) {//case work activity
-                    for (let j = 0; j < listTR.length; j++) {
-                        let momentActTREnd = moment(listTR[j].end, format);   // tr end
-                        let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                        if ((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd))
-                            && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart))) {
-                            listAcivityTR.work.push(listTR[j])
-                        }
+            //listMstActivity.forEach(e => {
+            if (checkActivityByGrup('Work', listMstActivity, listSL[i].activityName) || checkActivityByGrup('Meal', listMstActivity, listSL[i].activityName)) {//case work activity
+                //if ((e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase()&& e.groupType == 'Work') || (e.activityName.toUpperCase() == listSL[i].activityName.toUpperCase() && e.groupType == 'Meal')) {//case work activity
+                for (let j = 0; j < listTR.length; j++) {
+                    let momentActTREnd = moment(listTR[j].end, format);   // tr end
+                    let momentActTRStart = moment(listTR[j].start, format);  //tr start
+                    if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
+                        || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
+                        || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
+                    ) {
+                        listAcivityTR.work.push(listTR[j])
                     }
                 }
-            })
+            }
+            // })
             lastTimeSchedule = listSL[i].end
         }
 
@@ -495,28 +716,36 @@ async function splitActivityTRBySL(listSL, listTR, cond, listMstActivity) {
 
         // console.log('activityAfterSchedule:', activityAfterSchedule)
 
-
+        console.log(listAcivityTR)
         return listAcivityTR
     } else if (cond == 'Work') {
         let lastTimeSchedule
         // check Activity ตามช่วงเวลาของ SL
-        for (let i = 0; i < listSL.length; i++) {
-            let momentActSLEnd = moment(listSL[i].end, format);// sl end
-            let momentActSLStart = moment(listSL[i].start, format);// sl start
-            let activityList = []
-            for (let j = 0; j < listTR.length; j++) {
-                let momentActTREnd = moment(listTR[j].end, format);   // tr end
-                let momentActTRStart = moment(listTR[j].start, format);  //tr start
-                if ((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd))
-                    && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart))) {
-                    listAcivityTR.work.push(listTR[j])
-                }
-            }
 
-            if (checkActivityByGrup('Special', listMstActivity, listSL[i].activityName)) {
-                listAcivityTR.special.push(listSL[i])
+
+        for (let i = 0; i < listSL.length; i++) {
+            if (checkActivityByGrup('Work', listMstActivity, listSL[i].activityName) || checkActivityByGrup('Meal', listMstActivity, listSL[i].activityName)) {
+                let momentActSLEnd = moment(listSL[i].end, format);// sl end
+                let momentActSLStart = moment(listSL[i].start, format);// sl start
+                let activityList = []
+                for (let j = 0; j < listTR.length; j++) {
+                    if (checkActivityByGrup('Work', listMstActivity, listTR[j].activityName)) {
+                        let momentActTREnd = moment(listTR[j].end, format);   // tr end
+                        let momentActTRStart = moment(listTR[j].start, format);  //tr start
+                        if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
+                            || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
+                            || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
+                        ) {
+                            listAcivityTR.work.push(listTR[j])
+                        }
+                    }
+                }
+
+                if (checkActivityByGrup('Special', listMstActivity, listSL[i].activityName)) {
+                    listAcivityTR.special.push(listSL[i])
+                }
+                lastTimeSchedule = listSL[i].end //เอาเวลาท้ายสุดของ SL เพื่อมาคำนวนหา actvity ต่อจากส่วนนี้
             }
-            lastTimeSchedule = listSL[i].end //เอาเวลาท้ายสุดของ SL เพื่อมาคำนวนหา actvity ต่อจากส่วนนี้
         }
 
         if (isNotEmpty(lastTimeSchedule)) {
@@ -560,7 +789,66 @@ function activityHourPaid(start, end, hour) {
 }
 
 
-function normalWork(listTR, listMstActivity, type) {
+function beforeAfterOT(listTR, listMstActivity, actualClock) {
+
+    console.log(listTR)
+    let hour = {
+        work: '00:00:00',
+        otBefore: '00:00:00',
+        otAfter: '00:00:00',
+        isPaid: false
+    }
+    //จะมีแค่ list activity tr work เท่านั้น เพราะเป็นเวลาทำงานปกติ
+    if (!isEmptyArray(listTR.work)) {
+        listTR.work.forEach(tr => {
+            listMstActivity.forEach(mstAct => {
+                if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Work') {
+                    hour.work = activityHourPaid(tr.start, tr.end, hour.work)
+                }
+            })
+        })
+        if (!isEmptyArray(listTR.special)) {
+            listTR.special.forEach(trSpecial => {
+                hour.work = activityHourPaid(trSpecial.start, trSpecial.end, hour.work)
+            })
+        }
+    }
+
+    if (!isEmptyArray(listTR.otBefore)) {
+        listTR.otBefore.forEach(tr => {
+            listMstActivity.forEach(mstAct => {
+                if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Work') {
+                    hour.otBefore = activityHourPaid(tr.start, tr.end, hour.otBefore)
+                }
+            })
+        })
+    }
+
+    if (!isEmptyArray(listTR.otAfter)) {
+        listTR.otAfter.forEach(tr => {
+            listMstActivity.forEach(mstAct => {
+                if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Work') {
+                    hour.otAfter = activityHourPaid(tr.start, tr.end, hour.otAfter)
+                }
+            })
+        })
+    }
+
+
+    let hourWork = moment(hour.work, formatHour);
+    let stdWork = moment(standardWorkTime, formatHour);
+    if (stdWork.isBefore(hourWork) || stdWork.isSame(hourWork)) {
+        hour.isPaid = true
+    }
+
+    console.log('2 Overtime Time:', hour)
+    return hour
+
+
+}
+
+
+function normalWork(listTR, listMstActivity, type, actualClock) {
     console.log(listTR)
     let hour = {
         work: '00:00:00',
@@ -574,8 +862,9 @@ function normalWork(listTR, listMstActivity, type) {
         let = [];
         //let workTime = '00:00';
         //จะมีแค่ list activity tr work เท่านั้น เพราะเป็นเวลาทำงานปกติ
-        if (!isEmptyArray(listTR.overSchedule)) {
-            listTR.work.concat(listTR.overSchedule).forEach(tr => {
+        // if (!isEmptyArray(listTR.overSchedule)) {
+        if (!isEmptyArray(listTR.work)) {
+            listTR.work.forEach(tr => {
                 listMstActivity.forEach(mstAct => {
                     if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Work') {
                         hour.work = activityHourPaid(tr.start, tr.end, hour.work)
@@ -595,7 +884,7 @@ function normalWork(listTR, listMstActivity, type) {
         return hour.work
     } else if (type == 'ot') {
         console.log('Normal Overtime')
-        let = [];
+        //let  = [];
         //let hour.work = '00:00';
         //จะมีแค่ list activity tr work เท่านั้น เพราะเป็นเวลาทำงานปกติ
         if (!isEmptyArray(listTR.work)) {
@@ -633,6 +922,14 @@ function normalWork(listTR, listMstActivity, type) {
         if (stdWork.isBefore(hourWork) || stdWork.isSame(hourWork)) {
             hour.isPaid = true
         }
+
+        // if (!actualClock.late && !actualClock.lost) {
+        //     hour.isPaid = true
+        // } else {
+        //     hour.isPaid = false
+        // }
+
+
         console.log('Normal Overtime Time:', hour)
         return hour
     }
@@ -645,6 +942,7 @@ function findActualClockFromTR(schedule, listTR, listMstActivity) {
         lost: false,
         late: false
     }
+
     let scheduleStart = moment(schedule.start, format);
     let scheduleEnd = moment(schedule.end, format);
 
@@ -660,19 +958,23 @@ function findActualClockFromTR(schedule, listTR, listMstActivity) {
                     counter++
 
                     actualClockObj.start = tr.start
+                    actualClockObj.end = tr.end
                     actualClockObj.late = false
                 }
                 else if ((counter == 0) && (scheduleStart.isBefore(timeRecordStart) || scheduleStart.isSame(timeRecordStart))) {//  sl is before tr
                     counter++
                     actualClockObj.start = tr.start
+                    actualClockObj.end = tr.end
                     actualClockObj.late = true
                 }
                 else if ((counter > 0) && (scheduleEnd.isBetween(timeRecordStart, timeRecordEnd)
                     || scheduleEnd.isSame(timeRecordStart)
                     || scheduleEnd.isSame(timeRecordEnd))) {
+                    // actualClockObj.start = tr.start
                     actualClockObj.end = tr.end
                     actualClockObj.lost = false
                 } else if ((counter > 0) && (scheduleEnd.isAfter(timeRecordEnd))) {  //case lost
+                    //actualClockObj.start = tr.start
                     actualClockObj.end = tr.end
                     actualClockObj.lost = true
                 } else {
@@ -688,33 +990,198 @@ function findActualClockFromTR(schedule, listTR, listMstActivity) {
     return actualClockObj
 }
 
+function findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, normalSchedule) {
+    let actualClockObj = {
+        start: '',
+        end: '',
+        // lost: false,
+        // late: false
+    }
+
+    let arrCheckOverlapSchd = []
+    let scheduleOTStart = moment(scheduleOT.start, format);
+    let scheduleOTEnd = moment(scheduleOT.end, format);
+
+    let counter = 0;
+    listTR.forEach(tr => {
+        let timeRecordStart = moment(tr.start, format);
+        let timeRecordEnd = moment(tr.end, format);
+        listMstActivity.forEach(mstAct => {
+            if (tr.activityName == mstAct.activityName && mstAct.groupType == 'Work') {
+                if ((counter == 0) && scheduleOTStart.isBetween(timeRecordStart, timeRecordEnd)
+                    || scheduleOTStart.isSame(timeRecordStart)
+                    || scheduleOTStart.isSame(timeRecordEnd)) { //  sl is between tr
+                    counter++
+
+                    actualClockObj.start = tr.start
+                    // actualClockObj.late = false
+                    arrCheckOverlapSchd.push(tr)
+
+                }
+                else if ((counter == 0) && (scheduleOTStart.isBefore(timeRecordStart) || scheduleOTStart.isSame(timeRecordStart))) {//  sl is before tr
+                    counter++
+                    actualClockObj.start = tr.start
+                    //  actualClockObj.late = true
+                    arrCheckOverlapSchd.push(tr)
+                }
+                else if ((counter > 0) && (scheduleOTEnd.isBetween(timeRecordStart, timeRecordEnd)
+                    || scheduleOTEnd.isSame(timeRecordStart)
+                    || scheduleOTEnd.isSame(timeRecordEnd))) {
+                    actualClockObj.end = tr.end
+                    //  actualClockObj.lost = false
+                    arrCheckOverlapSchd.push(tr)
+                } else if ((counter > 0) && (scheduleOTEnd.isAfter(timeRecordEnd))) {  //case lost
+                    actualClockObj.end = tr.end
+                    //  actualClockObj.lost = true
+                    arrCheckOverlapSchd.push(tr)
+                } else {
+                    //console.log('findActualClockFromTR: tr not match to moment SL ')
+                }
+
+            } else {
+                // console.log('findActualClockFromTR: not group work type "work" ')
+            }
+
+        })
+    })
+    let nmSchdStart = moment(normalSchedule.start, format);
+    let nmSchdEnd = moment(normalSchedule.end, format);
+    if (nmSchdStart.isAfter(scheduleOTEnd) || nmSchdStart.isSame(scheduleOTEnd)) {  // OT ก่อน ต้อง check กับ Schedule start
+        if (!isEmptyArray(arrCheckOverlapSchd)) {
+            arrCheckOverlapSchd.some(e => {
+                let trStart = moment(e.start, format);
+                let trEnd = moment(e.end, format);
+                if (nmSchdStart.isBetween(trStart, trEnd)) {
+                    actualClockObj.end = normalSchedule.start
+                    return true
+                }
+            })
+        } else {
+            console.log('arrCheckOverlapSchd is Empty OT before')
+        }
+
+    } else { //OT หลัง ต้อง check กับ Schedule stop
+        if (!isEmptyArray(arrCheckOverlapSchd)) {
+            arrCheckOverlapSchd.some(e => {
+                let trStart = moment(e.start, format);
+                let trEnd = moment(e.end, format);
+                if (nmSchdEnd.isBetween(trStart, trEnd)) {
+                    actualClockObj.start = normalSchedule.end
+                    return true
+                }
+            })
+        } else {
+            console.log('arrCheckOverlapSchd is Empty OT After')
+        }
+    }
+    console.log('tempSchedule:', arrCheckOverlapSchd)
+    return actualClockObj
+
+}
+
+
+checkOverlapOT = (schedule, scheduleOT, listOT) => {
+
+    let scheduleOTStart = moment(scheduleOT.start, format);
+    let scheduleOTEnd = moment(scheduleOT.end, format);
+
+    let nmSchdStart = moment(schedule.start, format);
+    let nmSchdEnd = moment(schedule.end, format);
+    if (nmSchdStart.isAfter(scheduleOTEnd) || nmSchdStart.isSame(scheduleOTEnd)) {  // OT ก่อน ต้อง check กับ Schedule start
+        if (!isEmptyArray(listOT)) {
+            listOT.forEach(e => {
+                let trStart = moment(e.start, format);
+                let trEnd = moment(e.end, format);
+                if (nmSchdStart.isBetween(trStart, trEnd)) {
+                    e.end = schedule.start
+                    // return true
+                }
+            })
+        } else {
+            console.log('listOT is Empty OT before')
+        }
+
+    } else { //OT หลัง ต้อง check กับ Schedule stop
+        if (!isEmptyArray(listOT)) {
+            listOT.forEach(e => {
+                let trStart = moment(e.start, format);
+                let trEnd = moment(e.end, format);
+                if (nmSchdEnd.isBetween(trStart, trEnd)) {
+                    e.start = schedule.end
+                    // return true
+                }
+            })
+        } else {
+            console.log('listOT is Empty OT After')
+        }
+    }
+
+    //return listOT //list tr is overlap
+}
+
 async function findScheduleStartEnd(listSL, type) {
 
     let scheduleObj = {
         start: '',
         end: ''
     }
-    if (type == 'normal') {
-        scheduleObj.start = listSL[0].start
-        scheduleObj.end = listSL[listSL.length - 1].end
+    let scheduleObj2OT = {
+        before: {
+            start: '',
+            end: ''
+        },
+        after: {
+            start: '',
+            end: ''
+        }
+    }
 
+    let listMstActivityOT = await getActivityInfo('OT');
+    let listMstActivity = await getActivityInfo('ALL');
+
+    if (type == 'normal') {
+        // scheduleObj.start = listSL[0].start
+        // scheduleObj.end = listSL[listSL.length - 1].end
         console.log('findScheduleStartEnd normal')
+        let counter = 0;
+        listSL.forEach(e => {
+            if (checkActivityByGrup('Work', listMstActivity, e.activityName) && counter == 0) {
+                scheduleObj.start = e.start;
+                scheduleObj.end = e.end;
+                counter++
+            } else if (checkActivityByGrup('Work', listMstActivity, e.activityName) && counter > 0) {
+                scheduleObj.end = e.end;
+            }
+        })
     }
     else if (type == 'ot') {
 
         console.log('findScheduleStartEnd ot')
-        let listMstActivity = await getActivityInfo('ALL');
+
         listSL.some(e => {
             console.log(e)
-            if (checkActivityByGrup('OT', listMstActivity, e.activityName)) {
+            if (checkActivityByGrup('OT', listMstActivityOT, e.activityName)) {
                 scheduleObj.start = e.start;
                 scheduleObj.end = e.end;
                 return true;
             }
 
         })
+    } else if (type == '2OT') {
+        console.log('findScheduleStartEnd 2OT')
+        let count = 0;
+        listSL.forEach(e => {
+            if (checkActivityByGrup('OT', listMstActivityOT, e.activityName) && count == 0) {
+                scheduleObj2OT.before.start = e.start;
+                scheduleObj2OT.before.end = e.end;
+                count++
+            } else if (checkActivityByGrup('OT', listMstActivityOT, e.activityName) && count != 0) {
+                scheduleObj2OT.after.start = e.start;
+                scheduleObj2OT.after.end = e.end;
+            }
+        })
 
-
+        return scheduleObj2OT;
     }
 
     return scheduleObj
@@ -731,6 +1198,35 @@ function isOTCompensate(listSL, listTR) {
 
 }
 
+function setID(obj) {
+    objID.pin = isNotEmpty(obj.pin) ? obj.pin : ''
+    objID.txDetailSLId = isNotEmpty(obj.headerSL) ? obj.headerSL : ''
+    objID.txDetailTRId = isNotEmpty(obj.headerTR) ? obj.headerTR : ''
+    console.log('objID:', objID)
+    log.debug(objID)
+    return objID
+}
+
+
+getTimeLostOrlate = (schedule, actualClock) => {
+
+    let time = {
+        lost: '00:00:00',
+        late: '00:00:00'
+    }
+    if (actualClock.lost && actualClock.late) {
+        time.lost = activityHourPaid(schedule.end, actualClock.end, time.lost)
+        time.late = activityHourPaid(schedule.start, actualClock.start, time.late)
+    } else if (actualClock.late) {
+        time.late = activityHourPaid(schedule.start, actualClock.start, time.late)
+    } else if (actualClock.lost) {
+        time.lost = activityHourPaid(schedule.end, actualClock.end, time.lost)
+    } else {  // not late or lost
+        return time
+    }
+
+    return time
+}
 
 function isAutoOT(listSL, listTR) {
     let record = {
@@ -754,84 +1250,15 @@ function isAutoOT(listSL, listTR) {
 
 }
 
-// คือมี OT แค่ช่วงเวลาเดียว 
-function isNormalOvertime(listSL, listTR) {
-
-    let record = {
-        otStart: '',
-        otEnd: '',
-        hour: '',
-    }
-
-    let listAcivityTR = {
-        work: [],
-        ot: [],
-        otBefore: [],
-        otAfter: [],
-        overSchedule: []
-    }
-
-
-    if (!isEmptyArray(listTR.overSchedule)) {
-        listTR.work.concat(listTR.overSchedule).forEach(tr => {
-            listMstActivity.forEach(mstAct => {
-                if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Work') {
-                    workTime = activityHourPaid(tr.start, tr.end, workTime)
-                }
-                // else if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Not Ready') {
-                //     offTime = activityHourPaid(tr.start, tr.end, offTime)
-                // }
-            })
-        })
-    }
-
-    let actSLEndTime = moment(listSL.end, format);// sl end
-    let actSLStartTime = moment(listSL.start, format);// sl start
-    let activityList = []
-    for (let list of listTR) {
-        let momentActTREnd = moment(list.end, format);   // tr end
-        let momentActTRStart = moment(list.start, format);  //tr start
-        if ((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd))
-            && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart))) {
-            activityList.push(list)
-        }
-    }
-    if (!isEmptyArray(activityList)) {
-        record.otStart = activityList[0].start
-        record.otStart = activityList[0].end
-        let startTime = moment(activityList.shift().start, "HH:mm:ss");
-        let endTime = moment(activityList.pop().end, "HH:mm:ss");
-        let duration = moment.duration(endTime.diff(startTime));
-        let hours = Math.abs(parseInt(duration.get('hours')));
-        let minutes = Math.abs(parseInt(duration.get('minutes')));
-        let second = Math.abs(parseInt(duration.get('seconds')));
-        //console.log(hours + ' hour and ' + minutes + ' minutes.' + second);
-        record.hour = hours.pad() + ':' + minutes.pad() + ':' + second.pad()
-        console.log('record normal OT', record);
-    }
-    return record
-
-}
-
-function isOverTimeBeforeAfter() {
-
-
-
-}
-
-
-function setData2condLeave(objSL, isOverlap) {
-    // xh = +
-    let rec = recordType('lv')
-    rec.scheduleStartDt = obj.activitySL[0].start
-    rec.scheduleEndDt = obj.activitySL[obj.activitySL.length - 1].end
+async function setData2condLeave(objSL, isAllDay) {
+    let rec = recordType('LV')
 
     let start = true;
-    LEAVE_KEYWORD.some(e => {
+    KEYWORD.LEAVE.some(e => {
         if (start) {
-            obj.activitySL.some(act => {
+            objSL.some(act => {
                 if (e.ACTIVITY == act.activityName) {
-                    rec.recordType = isNotEmpty(e.KEY) ? e.Key : 'XX'
+                    rec.recordType = isNotEmpty(e.KEY) ? e.KEY : ''
                     start = false
                     return true
                 }
@@ -839,60 +1266,86 @@ function setData2condLeave(objSL, isOverlap) {
         }
     })
 
-    //let leaveType = sl.activity.split(' ')[0].substr(0, 1) + sl.activity.split(' ')[1].substr(0, 1)
-    //rec.recordType = leaveType
-
-    // rec.remark = leaveType + '(' + obj.activitySL.shift().start + '-' + obj.activitySL.pop().end + ')'
-
-    rec.remark = isNotEmpty(rec.leaveType) ? e.leaveType : 'Remark' + '('
-        + isNotEmpty(rec.scheduleStartDt) ? e.scheduleStartDt : 'starttime'
-            + '-'
-            + isNotEmpty(rec.scheduleEndDt) ? e.scheduleEndDt : 'endtime' + ')'
-    let scheduleDate = moment(obj.scheduleDate).format('YYYY-MM-DD');
-    rec.recordDate = scheduleDate
     let currentDate = moment(new Date()).format("YYYY-MM-DD")
     rec.createDt = currentDate
     rec.createBy = 'Batch'
+
+    if (isAllDay) {
+        rec.scheduleStartDt = objSL[0].start
+        rec.scheduleEndDt = objSL[objSL.length - 1].end
+
+        rec.remark = remark(rec.recordType, rec.scheduleStartDt, rec.scheduleEndDt)
+
+    } else if (!isAllDay) {
+        let lsitSLLeave = [];
+        let listMstActivityLeave = await getActivityInfo('Leave');
+        objSL.forEach(e => {
+            if (checkActivityByGrup('Leave', listMstActivityLeave, e.activityName)) {
+                lsitSLLeave.push(e)
+            }
+        })
+
+        rec.remark = remark(rec.recordType, lsitSLLeave[0].start, lsitSLLeave[0].stop)
+    }
     return rec
 }
 
 
 function setData2condAllDaySpecial(objSL, isOverlap) {
     console.log('setData2condAllDaySpecial')
-    let rec = recordType('on')
+    let rec = recordType('ON')
     let flagPaid = hasShiftOrTransport(objSL, objSL)
-    rec.scheduleStartDt = obj.activitySL[0].start
-    rec.scheduleEndDt = obj.activitySL[obj.activitySL.length - 1].end
+    rec.scheduleStartDt = objSL[0].start
+    rec.scheduleEndDt = objSL[objSL.length - 1].end
     rec.shiftFlag = flagPaid.shift
     rec.transportFlag = flagPaid.transport
-
+    rec.actualClockinDt = objSL[0].start
+    rec.actualClockoutDt = objSL[objSL.length - 1].end
     return rec
 }
 
 
+function remark(word, start, end) {
+
+    return word + '(' + start + '-' + end + ')';
+}
+
+
+isLeaveActivity = async (listSL) => {
+    let isLeave = false
+    let listMstActivityLeave = await getActivityInfo('Leave');
+    listSL.some(e => {
+        if (checkActivityByGrup('Leave', listMstActivityLeave, e.activityName)) {
+            isLeave = true
+            return true
+        }
+    })
+    return isLeave
+}
+
 //call RDP 
-isHoliday = async (param) => {
+isHoliday = (param) => {
 
     // param.start
     // param.end
     // paran.active
 
-    return await param
+    return param
 }
 
 
 //call activityInfo
-getActivityInfo = async (param) => {
-    console.log('groupType:', param)
+getActivityInfo = (param) => {
     if (param == 'ALL')
-        return await infoActivity.
+        return infoActivity.
             findAll({
                 include: [{
                     all: true
                 }], raw: true,
             })
     else {
-        return await infoActivity.
+        console.log('groupType:', param)
+        return infoActivity.
             findAll({
                 where: {
                     groupType: param
@@ -948,161 +1401,317 @@ function sortTime(list, overlap) {
 
 
 
-function setData2DB(type, objHour, schedule, actualClock, flagPaid, actualClockOT, remark) {
-    let rec = recordType(type)//on
-    // let scheduleDate = moment(obj.scheduleDate).format('YYYY-MM-DD');
-    // rec.recordDate = scheduleDate;
+function setData2DB(type, objbyCond, objID) {
+    let rec = recordType(type)
+    let modelSummaryDetail = [];
+    rec.pin = objID.pin
+    rec.txDetailSLId = objID.txDetailSLId
+    rec.txDetailTRId = objID.txDetailTRId
 
-    if (type == 'on') {
-
-        if (objHour.isPaid) {
-            rec.ot15 = objHour.ot;
+    if (type == 'ON') {
+        if (objbyCond.objHour.isPaid) {
+            rec.ot15 = objbyCond.objHour.ot;
         }
-        if (isNotEmpty(actualClockOT.start) && isNotEmpty(actualClockOT.end)) {
-            rec.otStartDt = actualClockOT.start
-            rec.otEndDt = actualClockOT.end
-
+        if (isNotEmpty(objbyCond.actualClockOT)) {
+            if (isNotEmpty(objbyCond.actualClockOT.start) && isNotEmpty(objbyCond.actualClockOT.end)) {
+                rec.otStartDt = objbyCond.actualClockOT.start
+                rec.otEndDt = objbyCond.actualClockOT.end
+            }
         }
         let currentDate = moment(new Date()).format("YYYY-MM-DD");
         rec.createDt = currentDate;
+        rec.scheduleStartDt = objbyCond.schedule.start;
+        rec.scheduleEndDt = objbyCond.schedule.end;
+        if (isNotEmpty(objbyCond.actualClock)) {
+            if (isNotEmpty(objbyCond.actualClock.start) && isNotEmpty(objbyCond.actualClock.end)) {
+                rec.actualClockinDt = objbyCond.actualClock.start;
+                rec.actualClockoutDt = objbyCond.actualClock.end;
+            }
+        }
+        rec.lateTime = objbyCond.objTime.late
+        rec.lostTime = objbyCond.objTime.lost
 
-        rec.scheduleStartDt = schedule.start;
-        rec.scheduleEndDt = schedule.end;
-
-        rec.actualClockinDt = actualClock.start;
-        rec.actualClockoutDt = actualClock.end;
-
-        rec.shiftFlag = flagPaid.shift
-        rec.transportFlag = flagPaid.transport
-
-        rec.ot10 = '0.00';
+        rec.shiftFlag = objbyCond.flagPaid.shift
+        rec.transportFlag = objbyCond.flagPaid.transport
         rec.ot30 = '0.00';
-
         rec.recordMonth = '';
-        rec.remark = remark;
+        rec.remark = '';
         rec.createBy = 'Batch';
-        return rec
-    } else if (type == 'autoOT') {
+        modelSummaryDetail.push(rec)
 
-    }
-    else if (type == 'otcom') {
+        if (objbyCond.is2OT) {
+            let beforeOT = recordType('2OT')
+            let afterOT = recordType('2OT')
+            if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
+                let otBefore = objbyCond.actualClockOT.actualClockBefore;
+                if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
+                    beforeOT.otStartDt = otBefore.start
+                    beforeOT.otEndDt = otBefore.end
+                }
+            }
 
+            if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
+                let otAfter = objbyCond.actualClockOT.actualClockAfter;
+                if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
+                    afterOT.otStartDt = otAfter.start
+                    afterOT.otEndDt = otAfter.end
+                }
+            }
+
+            if (objbyCond.objHour.isPaid) {
+                beforeOT.ot30 = objbyCond.objHour.otBefore
+                afterOT.ot30 = objbyCond.objHour.otAfter
+            } else {
+                beforeOT.ot15 = objbyCond.objHour.otBefore
+                afterOT.ot15 = objbyCond.objHour.otAfter
+            }
+
+            modelSummaryDetail.push(beforeOT)
+            modelSummaryDetail.push(afterOT)
+        }
     }
-    //validate()
+    // else if (type == 'AutoOT') {
+    //     rec.pin = objID.pin
+    //     rec.txDetailSLId = objID.txDetailSLId
+    //     rec.txDetailTRId = objID.txDetailTRId
+    // }
+    // else if (type == 'OFF') {
+    //     rec.pin = objID.pin
+    //     rec.txDetailSLId = objID.txDetailSLId
+    //     rec.txDetailTRId = objID.txDetailTRId
+
+    // }
+    else if (type == 'OTCOM') {
+        //  if (objbyCond.objHour.isPaid) {
+
+        // }
+        if (isNotEmpty(objbyCond.actualClockOT)) {
+            if (isNotEmpty(objbyCond.actualClockOT.start) && isNotEmpty(objbyCond.actualClockOT.end)) {
+                rec.otStartDt = objbyCond.actualClockOT.start
+                rec.otEndDt = objbyCond.actualClockOT.end
+            }
+        }
+        let currentDate = moment(new Date()).format("YYYY-MM-DD");
+        rec.createDt = currentDate;
+        rec.scheduleStartDt = objbyCond.schedule.start;
+        rec.scheduleEndDt = objbyCond.schedule.end;
+        if (isNotEmpty(objbyCond.actualClock)) {
+            if (isNotEmpty(objbyCond.actualClock.start) && isNotEmpty(objbyCond.actualClock.end)) {
+                rec.actualClockinDt = objbyCond.actualClock.start;
+                rec.actualClockoutDt = objbyCond.actualClock.end;
+            }
+        }
+        rec.lateTime = objbyCond.objTime.late
+        rec.lostTime = objbyCond.objTime.lost
+
+        rec.shiftFlag = objbyCond.flagPaid.shift
+        rec.transportFlag = objbyCond.flagPaid.transport
+        rec.ot10 = '8:00';  // defualt 8 hour , standard work
+        rec.ot15 = '0.00';
+        rec.ot30 = objbyCond.objHour.ot;
+        rec.recordMonth = '';
+        rec.remark = '';
+        rec.createBy = 'Batch';
+        modelSummaryDetail.push(rec)
+        if (objbyCond.is2OT) {
+            let beforeOT = recordType('2OT')
+            let afterOT = recordType('2OT')
+            actualClockBefore
+            if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
+                let otBefore = objbyCond.actualClockOT.actualClockBefore;
+                if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
+                    beforeOT.otStartDt = otBefore.start
+                    beforeOT.otEndDt = otBefore.end
+                }
+            }
+
+            if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
+                let otAfter = objbyCond.actualClockOT.actualClockAfter;
+                if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
+                    afterOT.otStartDt = otAfter.start
+                    afterOT.otEndDt = otAfter.end
+                }
+            }
+
+            modelSummaryDetail.push(beforeOT)
+            modelSummaryDetail.push(afterOT)
+        }
+    }
+    let pass = false
+    modelSummaryDetail.every(e => {
+        if (validatePass(e)) {
+            pass = true
+            console.log('validatePass:', validatePass)
+        } else {
+            return false
+        }
+    })
+    try {
+        if (pass) {
+            console.log('rec:', rec)
+            // saveData2DB(rec)
+        }
+    }
+    catch (e) {
+        log.error(e)
+    }
+
 }
 
 
 function saveData2DB(modelSummaryDetail) {
 
+    // txSummaryDetail.create(modelSummaryDetail)
+    //     .then(todo => res.status(200).send(todo))
+    //     .catch(error => res.status(400).send(error));
 
-    txSummaryDetail.create(modelSummaryDetail)
+    txSummaryDetail.bulkCreate(modelSummaryDetail, { validate: true })
         .then(todo => res.status(200).send(todo))
-        .catch(error => res.status(400).send(error));;
-
+        .catch(error => res.status(400).send(error));
 }
 
-async function mapData2Obj(req, res) {
+async function mapData2Obj(summaryCheck) {
+    let employeeScheList = []
+    let mapTR = new Map();
+    try {
+        const listTR = await getTRDetailModel(summaryCheck);
+        //log.debug(listTR)
+        //console.log('listTR:', listTR.length)
+        // console.log('listTR:', listTR)
+        const listSL = await getSLDetailModel(summaryCheck)
+        //log.debug(listSL)
+        //console.log('listSL:', listSL.length)
+        // console.log('listSL:', listSL)
+        if (!isEmptyArray(listTR)) {
+            for (let tr of listTR) {
+                if (isNotEmpty(tr.ssn) && !isNotEmpty(mapTR.get(tr.ssn))) { //new ssn
+                    let listEmployeeTR = getNewObjbyType('InitObjTRMap')
+                    listEmployeeTR.pin = tr.ssn
+                    listEmployeeTR.headerTR = tr.headerId
+                    listEmployeeTR.organizeName = tr.organizeName
+                    listEmployeeTR.employeeName = tr.agentName
+                    listEmployeeTR.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
+                    mapTR.set(listEmployeeTR.pin, listEmployeeTR);  // change obj to map 
+                } else if (isNotEmpty(tr.ssn) && isNotEmpty(mapTR.get(tr.ssn))) {
+                    let tempMap = mapTR.get(tr.ssn);
+                    tempMap.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
+                    mapTR.set(tr.ssn, tempMap);
+                }
+            }//1152
+            console.log('mapTR:', mapTR.size)  //select ssn from tx_tr_detail where ssn is not null group by ssn order by ssn asc for check
+        } else {
+            console.log('empty TR detail')
+        }
+        if (isNotEmpty(listSL)) {
+            for (let sl of listSL) {
+                if ((isEmptyArray(employeeScheList) && isNotEmpty(sl.ssn)) || (employeeScheList.findIndex(e => { return e.pin == sl.ssn })) < 0 && isNotEmpty(sl.ssn)) {
+                    let list = getNewObjbyType('InitObj')
+                    //console.log(list.activitySL)
+                    list.pin = sl.ssn
+                    list.tz = sl.time_zone
+                    list.headerSL = sl.headerId
+                    list.scheduleDate = sl.scheduleDate
+                    //check overlap
+                    // let execDate = moment(sl.execDate, "YYYY-MM-DD" + format)
+                    // let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD" + format)
+                    let execDate = moment(sl.execDate, "YYYY-MM-DD")
+                    let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD")
+                    // console.log("overlap:" + execDate.isSame(scheduleDate))
+                    list.overlapTime = execDate.isSame(scheduleDate) ? false : true
 
-    //resetMstObjTRSL();   //reset old data if exist
-    employeeScheList = []
-    const listTR = await getTRDetail();
-    console.log('listTR:', listTR.length)
-    const listSL = await getSLDetail()
-    console.log('listSL:', listSL.length)
-    if (!isEmptyArray(listTR)) {
-        for (let tr of listTR) {
-            if (isNotEmpty(tr.ssn) && !isNotEmpty(mapTR.get(tr.ssn))) { //new ssn
-                let listEmployeeTR = getNewObjbyType('InitObjTRMap')
-                listEmployeeTR.pin = tr.ssn
-                listEmployeeTR.headerTR = tr.headerId
-                listEmployeeTR.organizeName = tr.organizeName
-                listEmployeeTR.employeeName = tr.agentName
-                listEmployeeTR.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
-                mapTR.set(listEmployeeTR.pin, listEmployeeTR);  // change obj to map 
-            } else if (isNotEmpty(tr.ssn) && isNotEmpty(mapTR.get(tr.ssn))) {
-                let tempMap = mapTR.get(tr.ssn);
-                tempMap.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
-                mapTR.set(tr.ssn, tempMap);
-            }
-        }//1152
-        console.log('mapTR:', mapTR.size)  //select ssn from tx_tr_detail where ssn is not null group by ssn order by ssn asc for check
-    } else {
-        console.log('empty TR detail')
-    }
-    if (isNotEmpty(listSL)) {
-        for (let sl of listSL) {
-            if ((isEmptyArray(employeeScheList) && isNotEmpty(sl.ssn)) || (employeeScheList.findIndex(e => { return e.pin == sl.ssn })) < 0 && isNotEmpty(sl.ssn)) {
-                let list = getNewObjbyType('InitObj')
-                //console.log(list.activitySL)
-                list.pin = sl.ssn
-                list.tz = sl.time_zone
-                list.headerSL = sl.headerId
-                list.scheduleDate = sl.scheduleDate
-                //check overlap
-                let execDate = moment(sl.execDate, "YYYY-MM-DD" + format)
-                let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD" + format)
-                // console.log("overlap:" + execDate.isSame(scheduleDate))
-                list.overlapTime = !execDate.isSame(scheduleDate)
-
-                list.activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
-                console.log('isNotEmpty(mapTR):', isNotEmpty(mapTR.get(sl.ssn)))
-                list.activityTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).activity : '';
-                list.organizeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).organizeName : '';
-                list.employeeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).employeeName : '';
-                list.headerTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).headerTR : '';
-                employeeScheList.push(list)   // mst obj SL,TR
-            } else {
-                let indexExistPin = employeeScheList.findIndex(e => { return e.pin == sl.ssn })
-                // console.log('indexExistPin:', indexExistPin)
-                if (indexExistPin >= 0) {
-                    employeeScheList[indexExistPin].activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
-                    //employeeScheList[indexExistPin].activityTR = isNotEmpty(mapTR.get(sl.pin)) ? mapTR.get(sl.pin).activity : '';
+                    list.activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
+                    //console.log('isNotEmpty(mapTR):', isNotEmpty(mapTR.get(sl.ssn)))
+                    list.activityTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).activity : '';
+                    list.organizeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).organizeName : '';
+                    list.employeeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).employeeName : '';
+                    list.headerTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).headerTR : '';
+                    employeeScheList.push(list)   // mst obj SL,TR
+                } else {
+                    let indexExistPin = employeeScheList.findIndex(e => { return e.pin == sl.ssn })
+                    // console.log('indexExistPin:', indexExistPin)
+                    if (indexExistPin >= 0) {
+                        employeeScheList[indexExistPin].activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
+                        //employeeScheList[indexExistPin].activityTR = isNotEmpty(mapTR.get(sl.pin)) ? mapTR.get(sl.pin).activity : '';
+                    }
                 }
             }
+            console.log('employeeScheList:', employeeScheList.length) // expect 1880
         }
-        console.log('employeeScheList:', employeeScheList.length) // expect 1880
+        else {
+            console.log('empty SL detail')
+        }
+    } catch (e) {
+        console.log('error:', e.error)
     }
-    else {
-        console.log('empty SL detail')
-    }
-    //  mapTR = null // reset data in map 
-    console.log(employeeScheList[0].pin)
-    console.log(employeeScheList[0].activityTR)
-    console.log(employeeScheList[0].activitySL)
-    console.log(mapTR.get('31007'))
+
+    return employeeScheList
 
 }
 
-const getSLDetail = (date) => {
-    // return txSlDetail.findAll({
-    //     where: {
-    //         scheduleDate: '2017-11-11'
-    //     },
-    //     include: [{
-    //         all: true
-    //     }], raw: true
-    // })
-
+const getSLDetailModel = (rec) => {
     return objSL
+    let yesterday = moment(rec.recordDt).format('YYYY-MM-DD');
+    let dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
+    return txSlDetail.findAll({
+        where: {
+            scheduleDate: yesterday,
+            // scheduleDate: dayBeforeYesterday,
+            headerId: rec.slHeaderId,
+            ssn: rec.pin,
+
+            // ssn: '32327'
+        },
+        //        limit: 2,
+        // include: [{
+        //     all: true   // จะ query ตาม associate ที่เกี่ยวข้องขึ้นมาด้วย 
+        // }]
+        // , raw: false   // จะ query raw  value ตาม database ซึ่งจะไม่ทำ function get ที่ config ไว้ทีตัว model 
+    }).then((todos) => { return nodeData = todos.map((node) => node.get({ plain: true })); console.log(node) })
+        .catch((error) => { console.log(error) });
+
 
 }
 
-const getTRDetail = (date) => {
-    //return txTrDetail.findAll({
-    // where: {
-    //     scheduleDate: '2017-11-11'
-    // },
-    //     include: [{
-    //         all: true
-    //     }], raw: true
-    // })
-
+const getTRDetailModel = (rec) => {
     return objTR
+    let yesterday = moment(rec.recordDt).format('YYYY-MM-DD');
+    let dayBeforeYesterday = moment(rec.recordDt).subtract(2, 'days').format('YYYY-MM-DD');
+    return txTrDetail.findAll({
+        where: {
+            // scheduleDate: rec.recordDt,
+            // scheduleDate: dayBeforeYesterday,
+            [Op.or]: [{ scheduleDate: yesterday }, { scheduleDate: dayBeforeYesterday }],
+            headerId: rec.trHeaderId,
+            ssn: rec.pin,
+            //headerId: '1081',
+            //ssn: '32327'
+        }
+    }).then((todos) => { return nodeData = todos.map((node) => node.get({ plain: true })); })
+        .catch((error) => { console.log(error) });
+
 }
+
+const getInfoSummaryCheckModel = () => {
+
+    let yesterday = moment('2017-11-12').subtract(1, 'days').format('YYYY-MM-DD');
+    let dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
+    return infoSummaryCheck.findAll({
+        attributes: ['pin', 'recordDt', 'slFlag', 'trFlag', 'slHeaderId', 'trHeaderId', 'genSumStartDt', 'genSumEndDt'],
+        where: {
+            genSumFlag: 'N',
+            recordDt: yesterday,
+            // recordDt: {
+            //     [Op.lte]: yesterday
+            // },
+        },
+        limit: 1,
+    }).then((todos) => { return nodeData = todos.map((node) => node.get({ plain: true })); })
+        .catch((error) => { console.log(error) });
+}
+
+
 
 function getNewObjbyType(type) {
-
-
     if (type === 'InitObj') {
         return {
             pin: '',
@@ -1167,7 +1776,101 @@ function getNewObjbyType(type) {
 //     }
 // }
 
+function validatePass(record) {
 
+    // if (record.txDetailSLId) {
+
+    // }
+    // if (record.txDetailTRId) {
+
+    // }
+
+    if (!isNotEmpty(record.pin)) {
+        log.debug("pin is Empty")
+        return false
+    }
+    // if (record.scheduleStartDt) {
+
+    // }
+    // if (record.scheduleEndDt) {
+
+    // }
+    // if (record.otStartDt) {
+
+    // }
+    // if (record.otEndDt) {
+
+    // }
+    // if (record.actualClockinDt) {
+
+    // }
+    // if (record.actualClockoutDt) {
+
+    // }
+    if (!isNotEmpty(record.recordType)) {
+        log.debug("recordType is Empty")
+        return false
+    }
+    // if (record.shiftFlag) {
+
+    // }
+    // if (record.transportFlag) {
+
+    // }
+    // if (record.ot10) {
+
+    // }
+    // if (record.ot15) {
+
+    // }
+    // if (record.ot30) {
+
+    // }
+    if (!isNotEmpty(record.recordDate)) {
+        log.debug("recordDate is Empty")
+        return false
+    } else {
+        record.recordDate = moment(record.recordDate).format("YYYY-MM-DD")
+    }
+    // if (record.recordMonth) {
+
+    // }
+    // if (record.remark) {
+
+    // }
+    if (!isNotEmpty(record.useFlag)) {
+        log.debug("useFlag is Empty")
+        return false
+    }
+    if (!isNotEmpty(record.createBy)) {
+        log.debug("createBy is Empty")
+        return false
+    }
+    if (record.createDt) {
+        log.debug("createDt is Empty")
+        return false
+    } else {
+        record.createDt = moment(record.createDt).format("YYYY-MM-DD" + format)
+    }
+
+    return true
+
+}
+
+function findGrupType(arr, listMstActivity) {
+    let grupTypeSchedule = []
+    arr.forEach(async obj => {
+        for (let sl of obj.activitySL) {   //หา group type จาก SL เก็บใน Array
+            for (let mstAct of listMstActivity) {
+                if (sl.activityName.toUpperCase() === mstAct.activityName.toUpperCase()) {
+                    grupTypeSchedule.push(mstAct.groupType)   // array of groupType that match mstActivity
+                    break
+                }
+            }
+        }
+    })
+    return grupTypeSchedule
+}
 
 
 
@@ -1179,8 +1882,14 @@ function getNewObjbyType(type) {
 //ค่ากะและค่ารถ check จากไฟล์ SL ว่ามีเวลาเข้างานอยู่ในช่วงเวลาดังกล่าวไหม 
 //ถ้าไม่มีก็ตัดทิ้ง ถ้ามีไป  check ไฟล์ TR และ clockin out ตามลำดับว่าครบ8 ชม ไหม
 
-function spiltData(data, symbol) {
-
+async function spiltData(data, symbol) {
+    await arrayToTxtFile(sumaryDetailObj, './test-output.txt', err => {
+        if (err) {
+            console.error(err)
+            return
+        }
+        console.log('Successfully wrote sumaryDetailObj to txt file')
+    })
 
 }
 
@@ -1207,6 +1916,7 @@ function hasShiftOrTransport(listSL, listTR) {
 
     return flagPaid;
 }
+
 
 
 
@@ -1289,7 +1999,6 @@ function checkStandardWorkTime(clockInTime, clockOutTime) {
 }
 
 function convertData2MstParam(data, type) {  // get value from mst_param and convert to data 
-
     if (type === 'Shift') {
         if (data) {
             return 100
@@ -1299,8 +2008,6 @@ function convertData2MstParam(data, type) {  // get value from mst_param and con
             return 170
         }
     }
-
-
 }
 
 Number.prototype.pad = function (size) {
@@ -1324,55 +2031,102 @@ function isEmptyArray(list) {
     return false
 }
 
-function getHour(start, end) {
-    let result = 0;
-    //let formatHour = 'HH:mm';
-    let startTime = moment(start, formatHour);
-    let endTime = moment(end, formatHour);
-    let minutesDiff = Math.abs(parseInt(endTime.diff(startTime, 'minutes')));
-    console.log('minutesDiff:', minutesDiff)
-    if (minutesDiff >= 60) {
-        let hour = Math.floor(minutesDiff / 60);
-        let minutes = parseInt(minutesDiff) - (parseInt(60) * parseInt(hour))
-        result = hour.pad() + ':' + minutes.pad();
-    } else {
-        result = minutesDiff
+function isTrue(str) {
+    if (str.toUpperCase() == 'Y') {
+        return true
     }
-
-    console.log('result:' + result)
-
+    return false
 }
+
+
+// function getHour(start, end) {
+//     let result = 0;
+//     //let formatHour = 'HH:mm';
+//     let startTime = moment(start, formatHour);
+//     let endTime = moment(end, formatHour);
+//     let minutesDiff = Math.abs(parseInt(endTime.diff(startTime, 'minutes')));
+//     console.log('minutesDiff:', minutesDiff)
+//     if (minutesDiff >= 60) {
+//         let hour = Math.floor(minutesDiff / 60);
+//         let minutes = parseInt(minutesDiff) - (parseInt(60) * parseInt(hour))
+//         result = hour.pad() + ':' + minutes.pad();
+//     } else {
+//         result = minutesDiff
+//     }
+
+//     console.log('result:' + result)
+
+// }
 
 Object.prototype.isEmptyObject = function () {
     return Object.keys(Object(this)).length === 0 ? true : false
 }
-function buildMap(obj) {
-    let map = new Map();
-    Object.keys(obj).forEach(key => {
-        map.set(key, obj[key]);
-    });
-    return map;
-}
+
 
 //obj SL for one record
+
+let ObjSLtrain = [
+    { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '09:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '09:00', stopDt: '13:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Meal', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '13:00', stopDt: '14:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '14:00', stopDt: '18:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '18:00', stopDt: '19:00' },
+]
 let objSL = [
+    //{ tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '09:00' },
     { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '09:00', stopDt: '13:00' },
     { tvid: '1048', ssn: '31049', activity: 'Meal', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '13:00', stopDt: '14:00' },
     // { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '07:00', stopDt: '07:20' },
     // { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '08:20' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '14:00', stopDt: '18:00' },
+    //{ tvid: '1048', ssn: '31049', activity: 'Business Leave', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '14:00', stopDt: '15:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '15:00', stopDt: '18:00' },
+    //
     { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '18:00', stopDt: '19:00' },
     // { tvid: '1048', ssn: '31049', activity: 'Training', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '19:00', stopDt: '19:28' }
 ]
+31377
 
+let testSL = [
+    //{ tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '09:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '20:00', stopDt: '00:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Meal', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '00:00', stopDt: '01:00' },
+    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '01:00', stopDt: '04:00' },
+    // { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '08:20' },
+]
+
+let testTR = [
+    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '07:59', stopDt: '08:36' },
+    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:36', stopDt: '08:37' },
+    { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:37', stopDt: '09:01' },
+    { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:01', stopDt: '09:03' },
+    { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:03', stopDt: '09:05' },
+    { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:05', stopDt: '09:15' },
+    { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:15', stopDt: '09:16' },
+    { modify: '1510367334', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Rest Room', startDt: '09:16', stopDt: '09:28' },
+    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:28', stopDt: '09:38' },
+    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:38', stopDt: '09:39' },
+    { modify: '1510368277', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:39', stopDt: '09:42' },
+    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:42', stopDt: '09:45' },
+    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:45', stopDt: '09:49' },
+    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:49', stopDt: '09:52' },
+    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:52', stopDt: '09:54' },
+    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:54', stopDt: '09:55' },
+
+    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '19:38', stopDt: '19:39' },
+    { modify: '1510368277', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '19:39', stopDt: '19:42' },
+    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '19:42', stopDt: '20:45' },
+    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '20:45', stopDt: '00:49' },
+    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '00:49', stopDt: '03:52' },
+    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '03:52', stopDt: '04:54' },
+    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '04:54', stopDt: '07:55' }
+]
 
 let objTR = [
-
-
     // { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Not Ready', startDt: '01:36', stopDt: '01:37' },
     // { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '01:58', stopDt: '01:01' },
-    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Not Ready', startDt: '08:36', stopDt: '08:37' },
-    { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:30', stopDt: '09:01' },
+    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '07:59', stopDt: '08:36' },
+    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:36', stopDt: '08:37' },
+    { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:37', stopDt: '09:01' },
     { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:01', stopDt: '09:03' },
     { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:03', stopDt: '09:05' },
     { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:05', stopDt: '09:15' },
@@ -1555,10 +2309,10 @@ let objTR = [
     { modify: '1510397713', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:53', stopDt: '17:54' },
     { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:54', stopDt: '17:57' },
     { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:57', stopDt: '17:58' },
-    { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:58', stopDt: '18:00' },
-    { modify: '1510398345', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '18:00', stopDt: '18:02' },
+    { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:58', stopDt: '17:59' },
+    { modify: '1510398345', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:59', stopDt: '18:02' },
     //  { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '18:02', stopDt: '18:08' },
     { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '18:02', stopDt: '18:50' },
-    { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '19:02', stopDt: '19:50' },
+    { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '18:50', stopDt: '19:50' },
 ]
 
