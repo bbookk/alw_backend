@@ -10,8 +10,13 @@ module.exports = (sequelize, DataTypes) => {
             autoIncrement: true
         },
         pin: {
-            type: DataTypes.STRING(20),
+            type: DataTypes.STRING(8),
             field: 'pin',
+            allowNull: false
+        },    
+        ssn: {
+            type: DataTypes.STRING(8),
+            field: 'ssn',
             allowNull: false
         },
         recordDt: {
@@ -62,6 +67,16 @@ module.exports = (sequelize, DataTypes) => {
             get: function () {
                 return moment.utc(this.getDataValue('genSumEndDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
             }
+        },
+        managerPin : {
+            type: DataTypes.STRING(8),
+            field: 'manager_pin',
+            allowNull: false
+        },
+        supervisorPin : {
+            type: DataTypes.STRING(8),
+            field: 'supervisor_pin',
+            allowNull: false
         }
     }, {
             schema: 'public',
@@ -74,5 +89,4 @@ module.exports = (sequelize, DataTypes) => {
 
 module.exports.initRelations = () => {
     delete module.exports.initRelations; // Destroy itself to prevent repeated calls.
-
 };

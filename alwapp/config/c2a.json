@@ -1,0 +1,18 @@
+{
+    "local": {
+        "enable": "false",
+        "key_base": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    },
+    "development": {
+        "enable": "false",
+        "key_base": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    },
+    "staging": {
+        "enable": "false",
+        "key_base": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    },
+    "production": {
+        "enable": "false",
+        "key_base": "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
+    }
+}

@@ -47,6 +47,26 @@ const infoActivityController = require('./info-activity');
      */
 const employeeController = require('./employee');
 
+/**
+     * Payroll
+     */
+const payrollController = require('./payroll');
+
+/**
+     * Agent
+     */
+const agentController = require('./agent');
+
+/**
+     * Authentication
+     */
+const authController = require('./authentication');
+
+/**
+     * Organize
+     */
+const organizeController = require('./organize');
+
 module.exports = {
   /**
    * Info Controller
@@ -92,4 +112,25 @@ module.exports = {
      * Employee
      */
     employeeController,
+
+  /**
+     * Payroll
+     */
+    payrollController,
+
+  /**
+     * Agent
+     */
+    agentController,
+
+  /**
+     * Authentication
+     */
+    authController,
+
+    /**
+     * Organize
+     */
+    organizeController,
+
   };

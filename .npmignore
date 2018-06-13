@@ -1,0 +1,8 @@
+# visual studio code
+.vscode
+
+#tests
+#test
+
+# npm pack file
+alws_backend-*.tgz

@@ -9,12 +9,12 @@ module.exports = (sequelize, DataTypes) => {
             primaryKey: true,
             autoIncrement: true
         },
-        txDetailSlId: {
+        txDetailSLId: {
             type: DataTypes.INTEGER,
             field: 'tx_detail_sl_id',
             allowNull: true
         },
-        txDetailTrId: {
+        txDetailTRId: {
             type: DataTypes.INTEGER,
             field: 'tx_detail_tr_id',
             allowNull: true
@@ -84,6 +84,16 @@ module.exports = (sequelize, DataTypes) => {
             field: 'ot_3_0',
             allowNull: true
         },
+        lateTime: {
+            type: DataTypes.STRING(6),
+            field: 'late_time',
+            allowNull: true
+        },
+        lostTime: {
+            type: DataTypes.STRING(6),
+            field: 'lost_time',
+            allowNull: true
+        },
         recordDate: {
             type: DataTypes.DATEONLY,
             field: 'record_date',
@@ -113,13 +123,48 @@ module.exports = (sequelize, DataTypes) => {
             type: DataTypes.DATE,
             field: 'create_dt',
             allowNull: false
-        }
+        }, 
+        managerPin: {
+            type: DataTypes.STRING(8),
+            field: 'manager_pin',
+            allowNull: true
+        },
+        superPin: {
+            type: DataTypes.STRING(8),
+            field: 'supervisor_pin',
+            allowNull: true
+        },
+        cmpy: {
+            type: DataTypes.STRING(30),
+            field: 'company',
+            allowNull: true
+        },
+        bu: {
+            type: DataTypes.STRING(30),
+            field: 'bu',
+            allowNull: true
+        },
+        fn: {
+            type: DataTypes.STRING(30),
+            field: 'fn',
+            allowNull: true
+        },
+        dp: {
+            type: DataTypes.STRING(30),
+            field: 'department',
+            allowNull: true
+        },
+        section: {
+            type: DataTypes.STRING(30),
+            field: 'section',
+            allowNull: true
+        },
     }, {
-        schema: 'public',
-        tableName: 'tx_summary_detail',
-        timestamps: false
-    });
-    
+            schema: 'public',
+            tableName: 'tx_summary_detail',
+            timestamps: false
+        });
+
 
     return TxSummaryDetail;
 };

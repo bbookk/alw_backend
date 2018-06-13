@@ -1,3 +1,7 @@
+const ServiceError = require('../class/service-error');
+const Constant = require('../class/constant').Constant;
+const HolidayInfo = require('../class/holiday-info');
+
 var soap = require('strong-soap').soap;
 var textService = require('./text-service');
 /**
@@ -5,9 +9,15 @@ var textService = require('./text-service');
  */
 const logService = require('../service/log-service');
 
+const SERVICE_ID = 'RDP';
+
 module.exports.getHolidayByDate = (start,end) => {
     return new Promise((resolve, reject) => 
     {
+        // to calculate procesing time
+        var startTime = Date.now();
+        var methodName = 'GET_HOLIDAYS';
+
         try
         {
             if (logService.isDebugEnabled()) {
@@ -74,7 +84,7 @@ module.exports.getHolidayByDate = (start,end) => {
                 }
 
                 if (err) {
-                    reject(err);
+                    throw err;
                 }
 
                 client.addSoapHeader("<wsrm:Sequence xmlns:wsrm=\"http://docs.oasis-open.org/ws-rx/wsrm/200702\"><wsrm:Identifier>s:Sender a:ActionNotSupported</wsrm:Identifier><wsrm:MessageNumber>1</wsrm:MessageNumber></wsrm:Sequence>");
@@ -95,48 +105,131 @@ module.exports.getHolidayByDate = (start,end) => {
                 // var description = client.describe();
                 // console.log(client.httptempuriorgIRdpManageServiceGET_HOLIDAYS);
                 //console.log(JSON.stringify(description.RdpManageService.RdpManageServiceSoap.GET_HOLIDAYS));
-                var method = client['RdpManageService']['WSHttpBinding_IRdpManageService']['GET_HOLIDAYS'];
+                var method = client['RdpManageService']['WSHttpBinding_IRdpManageService'][methodName];
                 // var method = client['rdpwsRdpManageServicesvcService']['rdpwsRdpManageServicesvcPort']['httptempuriorgIRdpManageServiceGET_HOLIDAYS'];
 
                 if (logService.isDebugEnabled()) {
                     logService.debug('Before call soap');
                 }
                 method(requestArgs, function(err, result, envelope, soapHeader) {
-                    if (logService.isDebugEnabled()) {
-                        logService.debug('after call soap');
-                    }
+                    var errorMessage;
+                    var errorCode;
 
-                    if (err) {
-                    //    console.log(err);
-                        reject(err);
-                    }
-                    
-                    //response envelope
-                    if (logService.isTraceEnabled()) {
-                        logService.trace('Response Envelope: \n' + envelope);
-                    }
-                    //'result' is the response body
-                    if (logService.isTraceEnabled()) {
-                        logService.trace('Result: \n' + JSON.stringify(result));
-                    }
+                    try {
+                        if (logService.isDebugEnabled()) {
+                            logService.debug('after call soap');
+                        }
 
-                    if (result) {
-                        resolve(result);
-                    } else {
-                        reject(result);
-                    }
+                        if (err) {
+                            throw err;
+                        }
+                        
+                        //response envelope
+                        if (logService.isTraceEnabled()) {
+                            logService.trace('Response Envelope: \n' + envelope);
+                        }
+                        //'result' is the response body
+                        if (logService.isTraceEnabled()) {
+                            logService.trace('Result: \n' + JSON.stringify(result));
+                        }
 
-                    if (logService.isDebugEnabled()) {
-                        logService.debug('End: rdp-service.getHolidayByDate');
+                        var organizeInfoList = [];
+
+                        if (logService.isDebugEnabled()) {
+                            logService.debug('End: rdp-service.getHolidayByDate');
+                        }
+
+                        if (result) {
+
+                            var omHolidayList = result['GET_HOLIDAYSResult']['Holiday'];
+
+                            if (omHolidayList) {
+                                omHolidayList.forEach (function (omHoliday) {
+                                    organizeInfoList.push(toHolidayInfo(omHoliday));
+                                });
+                            }
+
+                            resolve(organizeInfoList);
+                        } else {
+                            reject(result);
+                        }
+                    } catch (err) {
+                        logService.error(err);
+
+                        errorMessage = err.message;
+                        if (! errorCode) {
+                            errorCode = Constant.SERVICE.ERROR_CODE_UNKNOWN;
+                        }
+
+                        // check if timeout
+                        if (err.message.indexOf('timed out') != -1) {
+                            errorCode = Constant.SERVICE.ERROR_CODE_CONNECTION_TIMEOUT;
+                        }
+
+                        reject (new ServiceError(errorMessage, errorCode));                        
+                    } finally {
+                        logService.log_service(
+                            {
+                                id: SERVICE_ID,
+                                name: methodName,
+                                req: 'REQUEST',
+                                res: 'RESPONSE',
+                                message: errorMessage,
+                                statusCode: errorCode,
+                                time: (Date.now() - startTime)
+                            }
+                        );
                     }
                 });
               });
         }
         catch (err) {
             logService.error(err);
+
+            var serviceError = null;
+            
+            if (err.message)
+            {
+                // check if timeout
+                if (err.message.indexOf('ECONNRESET') != -1) {
+                    serviceError = new ServiceError(err.message, Constant.SERVICE.ERROR_CODE_CONNECTION_RESET);
+                } else {
+                    serviceError = new ServiceError(err, Constant.SERVICE.ERROR_CODE_UNKNOWN);
+                }
+            } else {
+                // reject with general error
+                serviceError = new ServiceError(err, Constant.SERVICE.ERROR_CODE_UNKNOWN);
+            }
+
+            // do log service
+            logService.log_service(
+                {
+                    id: SERVICE_ID,
+                    name: methodName,
+                    req: JSON.stringify(body),
+                    resp: '',
+                    message: serviceError.message,
+                    statusCode: serviceError.code,
+                    time: (Date.now() - startTime)
+                }
+            );
+
             reject(err);
         }
     });
+}
+
+let toHolidayInfo = (rdpHolidayRecord) => {
+    var holidayInfo = new HolidayInfo();
+
+    holidayInfo.id = rdpHolidayRecord['ID'];
+    holidayInfo.holidayDesc = rdpHolidayRecord['HOLIDAY_DESCRIPTION'];
+    holidayInfo.endDate = rdpHolidayRecord['END_DATE'];
+    holidayInfo.startDate = rdpHolidayRecord['START_DATE'];
+    holidayInfo.isActive = rdpHolidayRecord['IS_ACTIVE'];
+    holidayInfo.nbr = rdpHolidayRecord['Nbr'];
+
+    return holidayInfo;
 }
 
 module.exports.isSpecialDay = async (date) => {

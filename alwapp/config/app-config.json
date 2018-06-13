@@ -1,0 +1,34 @@
+{
+    "local": {
+        "allowed_company_code": [
+                "50030642","50054188","50090294"
+        ],
+        "allowed_company_name": [
+            "AIS","ACC","AWN"
+        ]
+    }, 
+    "development": {
+        "allowed_company_code": [
+                "50030642","50054188","50090294"
+        ],
+        "allowed_company_name": [
+            "AIS","ACC","AWN"
+        ]
+    }, 
+    "staging": {
+        "allowed_company_code": [
+            "50030642","50054188","50090294"
+        ],
+        "allowed_company_name": [
+            "AIS","ACC","AWN"
+        ]
+    }, 
+    "production": {
+        "allowed_company_code": [
+            "50030642","50054188","50090294"
+        ],
+        "allowed_company_name": [
+            "AIS","ACC","AWN"
+        ]
+    }
+}

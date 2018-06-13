@@ -37,18 +37,42 @@
     },
     "timezone": "Asia/Bangkok"
   },
-  "test": {
-    "username": "root",
-    "password": null,
-    "database": "database_test",
-    "host": "127.0.0.1",
-    "dialect": "postgres"
+  "staging": {
+    "operatorsAliases": false,
+    "username": "alwsdbuser",
+    "password": "ais@1234",
+    "database": "alwsdb",
+    "host": "10.138.44.168",
+    "dialect": "postgres",
+    "logging": false,
+    "dialectOptions": {
+      "useUTC": false
+    },
+    "pool": {
+      "max": "5",
+      "min": "0",
+      "acquire": "30000",
+      "idle": "10000"
+    },
+    "timezone": "Asia/Bangkok"
   },
   "production": {
-    "username": "root",
-    "password": null,
-    "database": "database_production",
-    "host": "127.0.0.1",
-    "dialect": "postgres"
+    "operatorsAliases": false,
+    "username": "alwsdbuser",
+    "password": "ais@1234",
+    "database": "alwsdb",
+    "host": "10.197.73.108",
+    "dialect": "postgres",
+    "logging": false,
+    "dialectOptions": {
+      "useUTC": false
+    },
+    "pool": {
+      "max": "5",
+      "min": "0",
+      "acquire": "30000",
+      "idle": "10000"
+    },
+    "timezone": "Asia/Bangkok"
   }
 }

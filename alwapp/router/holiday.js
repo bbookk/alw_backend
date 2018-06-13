@@ -5,8 +5,8 @@ const employeeController = require('../controllers').employeeController;
  */
 module.exports = [
     { 
-        method: 'GET', path: '/holiday', handler: async function (request, reply) {
-            employeeController.getHolidayByDate(request, reply);
+        method: 'GET', path: '/holiday', config: { auth: false }, handler: async function (request, reply) {
+            return employeeController.getHolidayByDate(request, reply);
         } 
     }
 ];

@@ -12,34 +12,36 @@
         "category": "http"
       },
       "app": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "C:/iProjects/AIS/03_Source/logs/alws-app/app.log",
+        "pattern": "-yyyy-MM-dd",
         "layout": {
           "type": "pattern",
-          "pattern": "%d %p %c %X{script} %m"
-        },
-        "maxLogSize": 10485760,
-        "numBackups": 3
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "traceFile": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "C:/iProjects/AIS/03_Source/logs/alws-app/trace.log",
+        "pattern": "-yyyy-MM-dd",
         "layout": {
           "type": "pattern",
-          "pattern": "%d %p %c %X{script} %m"
-        },
-        "maxLogSize": 10485760,
-        "numBackups": 3
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "service": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "C:/iProjects/AIS/03_Source/logs/alws-app/service.log",
-        "maxLogSize": 10485760,
-        "numBackups": 3
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+          "type": "pattern",
+          "pattern": "%d|%m"
+        }
       },
       "errorFile": {
-        "type": "file",
-        "filename": "C:/iProjects/AIS/03_Source/logs/alws-app/errors.log"
+        "type": "dateFile",
+        "filename": "C:/iProjects/AIS/03_Source/logs/alws-app/errors.log",
+        "pattern": "-yyyy-MM-dd"
       },
       "errors": {
         "type": "logLevelFilter",
@@ -49,14 +51,14 @@
       "tracing": {
         "type": "logLevelFilter",
         "level": "TRACE",
+        "maxLevel": "TRACE",
         "appender": "traceFile"
       }
     },
     "categories": {
       "default": { "appenders": [ "app", "errors", "tracing" ], "level": "DEBUG" },
       "http": { "appenders": [ "access"], "level": "DEBUG" },
-      "service": { "appenders": [ "service"], "level": "DEBUG" },
-      "trace": { "appenders": [ "app"], "level": "DEBUG" }
+      "service": { "appenders": [ "service"], "level": "DEBUG" }
     }
   },
   "development": {
@@ -72,34 +74,40 @@
         "category": "http"
       },
       "app": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "/app/alws/logs/alws-app/app.log",
+        "pattern": "-yyyy-MM-dd",
         "layout": {
           "type": "pattern",
-          "pattern": "%d %p %c %X{script} %m"
-        },
-        "maxLogSize": 10485760,
-        "numBackups": 3
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "traceFile": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "/app/alws/logs/alws-app/trace.log",
+        "pattern": "-yyyy-MM-dd",
         "layout": {
           "type": "pattern",
-          "pattern": "%d %p %c %X{script} %m"
-        },
-        "maxLogSize": 10485760,
-        "numBackups": 3
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "service": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "/app/alws/logs/alws-app/service.log",
-        "maxLogSize": 10485760,
-        "numBackups": 3
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+            "type": "pattern",
+            "pattern": "%d|%m"
+        }
       },
       "errorFile": {
-        "type": "file",
-        "filename": "/app/alws/logs/alws-app/errors.log"
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/errors.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+          "type": "pattern",
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "errors": {
         "type": "logLevelFilter",
@@ -109,14 +117,14 @@
       "tracing": {
         "type": "logLevelFilter",
         "level": "TRACE",
+        "maxLevel": "TRACE",
         "appender": "traceFile"
       }
     },
     "categories": {
       "default": { "appenders": [ "app", "errors", "tracing" ], "level": "DEBUG" },
       "http": { "appenders": [ "access"], "level": "DEBUG" },
-      "service": { "appenders": [ "service"], "level": "DEBUG" },
-      "trace": { "appenders": [ "app"], "level": "DEBUG" }
+      "service": { "appenders": [ "service"], "level": "DEBUG" }
     }
   },
   "staging": {
@@ -132,34 +140,43 @@
         "category": "http"
       },
       "app": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "/app/alws/logs/alws-app/app.log",
+        "pattern": "-yyyy-MM-dd",
         "layout": {
           "type": "pattern",
-          "pattern": "%d %p %c %X{script} %m"
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
         },
-        "maxLogSize": 10485760,
-        "numBackups": 3
+        "tokens": {
+          "script": "function(logEvent) { return __filename.slice(__dirname.length + 1);}"
+        }
       },
       "traceFile": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "/app/alws/logs/alws-app/trace.log",
+        "pattern": "-yyyy-MM-dd",
         "layout": {
           "type": "pattern",
-          "pattern": "%d %p %c %X{script} %m"
-        },
-        "maxLogSize": 10485760,
-        "numBackups": 3
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "service": {
-        "type": "file",
+        "type": "dateFile",
         "filename": "/app/alws/logs/alws-app/service.log",
-        "maxLogSize": 10485760,
-        "numBackups": 3
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+            "type": "pattern",
+            "pattern": "%d|%m"
+        }
       },
       "errorFile": {
-        "type": "file",
-        "filename": "/app/alws/logs/alws-app/errors.log"
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/errors.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+          "type": "pattern",
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
       },
       "errors": {
         "type": "logLevelFilter",
@@ -169,14 +186,80 @@
       "tracing": {
         "type": "logLevelFilter",
         "level": "TRACE",
+        "maxLevel": "TRACE",
         "appender": "traceFile"
       }
     },
     "categories": {
       "default": { "appenders": [ "app", "errors", "tracing" ], "level": "DEBUG" },
       "http": { "appenders": [ "access"], "level": "DEBUG" },
-      "service": { "appenders": [ "service"], "level": "DEBUG" },
-      "trace": { "appenders": [ "app"], "level": "DEBUG" }
+      "service": { "appenders": [ "service"], "level": "DEBUG" }
+    }
+  },
+  "production": {
+    "appenders": {
+      "access": {
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/access.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+            "type": "pattern",
+            "pattern": "%d|%m"
+        },
+        "category": "http"
+      },
+      "app": {
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/app.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+          "type": "pattern",
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
+      },
+      "traceFile": {
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/trace.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+          "type": "pattern",
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
+      },
+      "service": {
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/service.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+            "type": "pattern",
+            "pattern": "%d|%m"
+        }
+      },
+      "errorFile": {
+        "type": "dateFile",
+        "filename": "/app/alws/logs/alws-app/errors.log",
+        "pattern": "-yyyy-MM-dd",
+        "layout": {
+          "type": "pattern",
+          "pattern": "%d %p %c [%X{session_id}][%X{pin}] %m"
+        }
+      },
+      "errors": {
+        "type": "logLevelFilter",
+        "level": "ERROR",
+        "appender": "errorFile"
+      },
+      "tracing": {
+        "type": "logLevelFilter",
+        "level": "TRACE",
+        "maxLevel": "TRACE",
+        "appender": "traceFile"
+      }
+    },
+    "categories": {
+      "default": { "appenders": [ "app", "errors", "tracing" ], "level": "DEBUG" },
+      "http": { "appenders": [ "access"], "level": "DEBUG" },
+      "service": { "appenders": [ "service"], "level": "DEBUG" }
     }
   }
 }

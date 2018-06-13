@@ -1,3 +1,5 @@
+
+
 /*
    model
 */
@@ -17,12 +19,19 @@ const arrayToTxtFile = require('array-to-txt-file')
 /*
    service
 */
-const log = require('./log-service')
-
+const logger = require('./log-service')
+const rdpService = require('./rdp-service')
+const omService = require('./om-service')
 /*
    class
 */
-const KEYWORD = require('../class').Constant
+const MST = require('../class').Constant.Constant
+const SummaryInfo = require('../class').SummaryInfo
+
+/*
+   Test
+*/
+const obj = require('../../test/data/summary-data')
 
 
 const condShiftTime = '13:00:00|06:30:00'
@@ -35,6 +44,8 @@ const format = 'HH:mm:ss'
 const formatHour = 'HH:mm';
 const standardWorkTime = 8;
 
+const currentDate = moment().subtract(1, 'days').format('YYYY-MM-DD')
+const createDateTime = moment().format('YYYY-MM-DD HH:mm:ss')
 
 
 let objbyCond = {
@@ -48,7 +59,6 @@ let objbyCond = {
     isOTCom: false,
     is2OT: false,
     OT: { OT_1: '', OT1_5: '', OT_3: '' }
-
 }
 
 let objID = {
@@ -58,257 +68,163 @@ let objID = {
 }
 
 
-let recordType = (type) => {
-    if (type == 'ON')
-        return {
-            txDetailSLId: '',
-            txDetailTRId: '',
-            pin: '',
-            scheduleStartDt: 'x',
-            scheduleEndDt: 'x',
-            otStartDt: '',
-            otEndDt: '',
-            actualClockinDt: '0.00',
-            actualClockoutDt: '0.00',
-            recordType: 'ON',
-            shiftFlag: '',
-            transportFlag: '',
-            workHour: '',
-            ot10: '0.00',
-            ot15: '0.00',
-            ot30: '0.00',
-            recordDate: '',
-            recordMonth: '',
-            useFlag: 'N',
-            remark: '',
-            lateTime: '',
-            lostTime: '',
-            createBy: 'Batch',
-            createDt: '',
+module.exports = [
+    {
+        method: 'GET', path: '/start', config: { auth: false }, handler: async function (request, reply) {
+            logger.info('ProcessSummaryDetail')
+            await processSummaryDetail(request, reply);
+            return reply.response('sss').code(200)
         }
-    else if (type == 'OFF')
-        return {
-            txDetailSLId: '',
-            txDetailTRId: '',
-            pin: '',
-            scheduleStartDt: '',
-            scheduleEndDt: '',
-            otStartDt: '',
-            otEndDt: '',
-            actualClockinDt: '',
-            actualClockoutDt: '',
-            recordType: 'OFF',
-            shiftFlag: '',
-            transportFlag: '',
-            workHour: '',
-            ot10: '0.00',
-            ot15: '0.00',
-            ot30: '0.00',
-            recordDate: '',
-            recordMonth: '',
-            useFlag: 'N',
-            remark: 'Off',
-            lateTime: '',
-            lostTime: '',
-            createBy: 'Batch',
-            createDt: '',
-        }
-    else if (type == 'LV')
-        return {
-            txDetailSLId: 'x',
-            txDetailTRId: '',
-            pin: 'x',
-            scheduleStartDt: 'x',
-            scheduleEndDt: 'x',
-            otStartDt: '',
-            otEndDt: '',
-            actualClockinDt: '',
-            actualClockoutDt: '',
-            recordType: 'x',
-            shiftFlag: false,
-            transportFlag: false,
-            ot10: '0.00',
-            ot15: '0.00',
-            ot30: '0.00',
-            workHour: '',
-            recordDate: '',
-            recordMonth: '',
-            useFlag: 'N',
-            remark: 'x',
-            lateTime: '',
-            lostTime: '',
-            createBy: 'Batch',
-            createDt: '',
-        }
-    else if (type == 'AutoOT')
-        return {
-            txDetailSLId: '',
-            txDetailTRId: '',
-            pin: 'x',
-            scheduleStartDt: '',
-            scheduleEndDt: '',
-            otStartDt: '',
-            otEndDt: '',
-            actualClockinDt: '',
-            actualClockoutDt: '',
-            recordType: 'AutoOT',
-            shiftFlag: '',
-            transportFlag: '',
-            ot10: '8.00',
-            ot15: '0.00',
-            ot30: '0.00',
-            workHour: '',
-            recordDate: '',
-            recordMonth: '',
-            useFlag: 'N',
-            remark: 'x',
-            createBy: 'Batch',
-            lateTime: '',
-            lostTime: '',
-            createDt: '',
-        }
-    else if (type == '2OT')
-        return {
-            txDetailSLId: '',
-            txDetailTRId: '',
-            pin: 'x',
-            scheduleStartDt: '',
-            scheduleEndDt: '',
-            otStartDt: 'x',
-            otEndDt: 'x',
-            actualClockinDt: '',
-            actualClockoutDt: '',
-            recordType: 'x',
-            shiftFlag: '',
-            transportFlag: '',
-            ot10: '0.00',
-            ot15: '0.00',
-            ot30: '0.00',
-            workHour: '',
-            recordDate: '',
-            recordMonth: '',
-            useFlag: 'N',
-            remark: '',
-            createBy: 'Batch',
-            lateTime: '',
-            lostTime: '',
-            createDt: '',
-        }
-}
-
-
-module.exports.processSummaryDetail = async (req, res) => {
-
-    //let summaryCheck = await getInfoSummaryCheckModel();   // query record for summary detail 
-    //summaryCheck.forEach(async infoSummary => {
-    infoSummary = {
-        trFlag: 'Y',
-        slFlag: 'Y'
     }
-    let employeeScheList = await mapData2Obj(infoSummary); // set data to obj by one record
-    let listMstActivity = await getActivityInfo('ALL');
+];
 
-
-    let sumaryDetailObj = []   // array for insert to DB
-
-    let isHolidayFlag = await isHoliday(false)
-    console.log('employeeScheList length:', employeeScheList.length)
-    console.log('employeeScheList:', employeeScheList)
-    if (isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) {
-        /* Case don’t have TR 
-           such as case leave , case special Activity
-        */
-
-        /* keep groupType for Condition */
-        let grupTypeSchedule = findGrupType(employeeScheList, listMstActivity);
-        console.log('grupTypeSchedule:', grupTypeSchedule)
-
-        let findIndexSpecial = grupTypeSchedule.findIndex(e => { return e == 'Special' })
-        let findIndexWork = grupTypeSchedule.findIndex(e => { return e == 'Work' })
-        let findIndexLeave = grupTypeSchedule.findIndex(e => { return e == 'Leave' })
-        if (findIndexWork >= 0) {  // still update SL,TR
-            return false
+module.exports = [
+    {
+        method: 'GET', path: '/test', config: { auth: false }, handler: async function (request, reply) {
+            let workTime = moment('2017-01-0120:00:00', 'YYYY-MM-DD HH:mm:ss').add(8, 'hours'); // + 8 hour 
+            console.log(workTime)
+            let overlapDate = moment('2017-11-11', 'YYYY-MM-DD ' + format).add(1, 'day')
+            console.log(overlapDate)
+            return reply.response(workTime).code(200)
         }
-        else if (findIndexLeave >= 0 && findIndexWork < 0) { //case leave all day 
-            console.log('case Leave')
-            let sumaryDetailObj = await setData2condLeave(obj.activitySL, true)
-            let scheduleDate = moment(obj.scheduleDate).format('YYYY-MM-DD');
-            sumaryDetailObj.recordDate = scheduleDate
-            sumaryDetailObj.pin = isNotEmpty(employeeScheList.pin) ? employeeScheList.pin : ''
-            sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList.headerSL) ? employeeScheList.headerSL : ''
-            saveData2DB(sumaryDetailObj)
-        }
-        else if (findIndexSpecial >= 0 && findIndexWork < 0) { // case special all day 
-            console.log('Case Special activity All Day')
-            let sumaryDetailObj = setData2condAllDaySpecial(obj.activitySL, obj.overlapTime)
-            let scheduleDate = moment(employeeScheList.scheduleDate).format('YYYY-MM-DD');
-            sumaryDetailObj.recordDate = scheduleDate
-            sumaryDetailObj.pin = isNotEmpty(employeeScheList.pin) ? employeeScheList.pin : ''
-            sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList.headerSL) ? employeeScheList.headerSL : ''
-            saveData2DB(sumaryDetailObj)
-            // console.log('Case Special activity All Day record:', sumaryDetailObj)
-        }
-
-
-    } else if (!isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) { // case off
-
-        if (isHolidayFlag) {
-            /* dayOff == Holiday => AutoOT , one record by RecordType = 'AutoOT' */
-            console.log('Auto OT')
-            return setData2DB('AutoOT', '', setID(employeeScheList))
-        } else {
-            /* dayOff and !Holiday => OFF , one record by RecordType = 'AutoOT' */
-            console.log('Day OFF')
-            return setData2DB('OFF', '', setID(employeeScheList))
-        }
-    } else if (isTrue(infoSummary.slFlag) && isTrue(infoSummary.trFlag)) {
-
-        /* keep groupType for Condition */
-        let grupTypeSchedule = findGrupType(employeeScheList, listMstActivity);
-        console.log('grupTypeSchedule:', grupTypeSchedule)
-
-        employeeScheList.forEach(async obj => {
-            /* Case have TR and SL */
-            if (isNotEmpty(obj.activityTR) && isNotEmpty(obj.activitySL)) {
-                obj.activityTR = mapTRbySLDaily(obj.activitySL, obj.activityTR);   // new Array TR by Schedule SL
-                //let isLeave = await isLeaveActivity(obj.activitySL)
-                let result = await processWithCond(obj.activitySL, obj.activityTR, obj.overlapTime, grupTypeSchedule, listMstActivity, setID(obj));  //return ot hour and record type  and hour and late 
-                //let model = getNewObjbyType('ModelSummaryDetail');
-                console.log('result:', result)
-                // sumaryDetailObj.push(result)
-                // res.status(200).send(sumaryDetailObj)
-            }
-        })
     }
-    //})// getdata and map object to new format
+];
 
+processSummaryDetail = async (req, res) => {
 
-
-    // txSummaryDetail.create(model);
-    // if (!isEmptyArray(sumaryDetailObj)) {
-    //     saveData2DB(sumaryDetailObj)
+    let summaryCheck = await getInfoSummaryCheckModel();   // query record for summary detail 
+    // if (logger.isTraceEnabled()) {
+    //     logger.trace('Response summaryCheck:{} \n' + summaryCheck);
     // }
 
-    console.log('after calculate')
+    console.log('summaryCheck:', summaryCheck);
+    logger.debug('summaryCheck length:' + summaryCheck.length);
 
-    res.status(200).send('2313123')
 
+    /* Map Collect for PIN to AID , AID to PIN */
+    let mapPinAid = getMapPinAid(summaryCheck)
+    let mapPinToAid = mapPinAid.pinToAid
+    let mapAidToPin = mapPinAid.aidToPin
+
+    for (let infoSummary of summaryCheck) {
+        let employeeScheList = await mapData2Obj(infoSummary, mapAidToPin); // set data to obj by one record
+        if (isEmptyArray(employeeScheList)) {
+            console.log('PIN NOT MAP')
+        } else {
+            console.log(employeeScheList)
+            let listMstActivity = await getActivityInfo('ALL');
+
+            //let sumaryDetailObj = null   // array for insert to DB
+
+            let startRDP = changeFormatDate(infoSummary.recordDt, 'YYYY/MM/DD')
+            let endRDP = changeFormatDate(infoSummary.recordDt, 'YYYY/MM/DD')
+            let isHolidayFlag = await isHoliday(startRDP.endRDP)   // ต้องส่งวันที่เป็น scheduledate เข้าไป เพื่อ check ทำงานในวันหยุดนักขัตฤกษ์ไหม
+
+            logger.debug('employeeScheList length:' + employeeScheList.length);
+            logger.debug('employeeScheList:' + employeeScheList);
+            console.log('employeeScheList length:', employeeScheList.length)
+            console.log('employeeScheList:', employeeScheList)
+            if (isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) {
+                /* Case don’t have TR 
+                   such as case leave all Day , case special Activity all Day and case Lost all Day
+                */
+
+                /* keep groupType for Condition */
+                let grupTypeSchedule = findGrupType(employeeScheList, listMstActivity);
+                console.log('grupTypeSchedule:', grupTypeSchedule)
+
+                let findIndexSpecial = grupTypeSchedule.findIndex(e => { return e == 'Special' })
+                let findIndexWork = grupTypeSchedule.findIndex(e => { return e == 'Work' })
+                let findIndexLeave = grupTypeSchedule.findIndex(e => { return e == 'Leave' })
+                if (findIndexWork >= 0) {  // still update SL,TR
+                    console.log("case Lost AllDay")
+                    let sumaryDetailObj = setData2condLostAllDay(employeeScheList[0].activitySL, true, infoSummary.recordDt)
+                    let scheduleDate = moment(infoSummary.recordDt).format('YYYY-MM-DD');
+                    sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
+                    await saveData2DB(sumaryDetailObj.toObject())
+                }
+                else if (findIndexLeave >= 0 && findIndexWork < 0) { //case leave all day 
+                    console.log('case Leave')
+                    let sumaryDetailObj = await setData2condLeave(employeeScheList[0].activitySL, true, infoSummary.recordDt)
+                    let scheduleDate = moment(infoSummary.recordDt).format('YYYY-MM-DD');
+                    sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
+                    await saveData2DB(sumaryDetailObj.toObject())
+                }
+                else if (findIndexSpecial >= 0 && findIndexWork < 0) { // case special all day 
+                    console.log('Case Special activity All Day')
+                    sumaryDetailObj = setData2condAllDaySpecial(employeeScheList[0].activitySL, obj.overlapTime, infoSummary.recordDt)
+                    let scheduleDate = moment(employeeScheList[0].scheduleDate).format('YYYY-MM-DD');
+                    sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
+                    sumaryDetailObj.toObject()
+                    await saveData2DB(sumaryDetailObj.toObject())
+                }
+            } else if (!isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) { // case off
+
+                if (isHolidayFlag) {
+                    /* dayOff == Holiday => AutoOT , one record by RecordType = 'AutoOT' */
+                    console.log('Auto OT')
+                    return setData2DB('AutoOT', '', setID(infoSummary))
+                } else {
+                    /* dayOff and !Holiday => OFF , one record by RecordType = 'AutoOT' */
+                    console.log('Day OFF')
+                    return setData2DB('OFF', '', setID(infoSummary))
+                }
+            } else if (isTrue(infoSummary.slFlag) && isTrue(infoSummary.trFlag)) {
+
+                /* keep groupType for Condition */
+                let grupTypeSchedule = findGrupType(employeeScheList, listMstActivity);
+                console.log('grupTypeSchedule:', grupTypeSchedule)
+
+                if (await isLeaveActivityAllDay(employeeScheList[0].activitySL)) {
+                    let sumaryDetailObj = await setData2condLeave(employeeScheList[0].activitySL, true, infoSummary.recordDt)
+                    let scheduleDate = moment(infoSummary.recordDt).format('YYYY-MM-DD');
+                    sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
+                    await saveData2DB(sumaryDetailObj.toObject())
+                }
+                else {
+                    for (let obj of employeeScheList) {
+                        /* Case have TR and SL */
+                        if (isNotEmpty(obj.activityTR) && isNotEmpty(obj.activitySL)) {
+                            if (obj.overlapTime) {
+                                let schedule = await findScheduleStartEnd(obj.activitySL, 'normal')   // find schedule start - end for spilt tr to new array 
+                                obj.activityTR = mapTRbySLDaily(schedule, obj.activityTR);   // new Array TR by Schedule SL ,Support case overlap
+                                console.log('Tr Activity with overlap:', obj.activityTR)
+                            }
+                            //let isLeave = await isLeaveActivity(obj.activitySL)
+                            await processWithCond(obj.activitySL, obj.activityTR, obj.overlapTime, grupTypeSchedule, listMstActivity, setID(obj), isHolidayFlag);  //return ot hour and record type  and hour and late 
+
+                        }
+                    }
+                }
+            }
+        }
+    }//end loop summaryCheck
+    console.log('after process')
 }
 
 
-async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, listMstActivity, objID) {
+async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, listMstActivity, objID, holidayFlag) {
 
     // sortTime(listSL, overlapTime);   //sort asc
     // sortTime(listTR, overlapTime);   //sort asc
 
     let cond = {
-        isHoliday: await isHoliday(false), // call RDP return ture , false
+        isHoliday: holidayFlag, // call RDP return ture , false
         scheOT: 0,
         dayOff: false,
         work: false,
         compensate: false,
         isActSpecial: false,
-        isLeave: await isLeaveActivity(listSL)
+        isLeave: await isLeaveActivity(listSL), // condition for check leave between work 
+        isLeaveAllDay: await isLeaveActivityAllDay(listSL) // condition for check leave all day but have tr  => OTCOM
     }
     console.log('cond.isHoliday:' + cond.isHoliday)
     grupTypeSchedule.forEach(e => {
@@ -331,7 +247,7 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
 
     console.log('cond:', cond)
 
-    let flagPaid = hasShiftOrTransport(listSL, listTR)    // คำนวนค่ากะ ค่ารถ return เป็น obj flag
+    let flagPaid = hasShiftOrTransport(listSL, listTR, overlapTime, objID.scheduleDate)    // คำนวนค่ากะ ค่ารถ return เป็น obj flag
 
 
     if (cond.isHoliday && cond.work) {
@@ -346,8 +262,8 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
         } else if (cond.scheOT == 0 && cond.work) {
             /* ScheduleNormal , one record by RecordType = 'ON' */
             return normalCond(listSL, listTR, listMstActivity, flagPaid, true, objID)
-
         }
+
     }
     if (cond.scheOT == 1 && cond.work && !cond.isHoliday) {
         /* Schedule Normal + OT, one record by RecordType = 'ON' */
@@ -361,6 +277,10 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
         /* ScheduleNormal , one record by RecordType = 'ON' */
         return normalCond(listSL, listTR, listMstActivity, flagPaid, false, objID)
     }
+    // if (cond.isLeaveAllDay && !cond.isHoliday) {
+    //     /* Leave All Day , one record by RecordType = 'OTCOM' */
+    //     return otComLeaveAllDay(listSL, listTR, listMstActivity, flagPaid, true, objID)
+    // }
 }
 
 
@@ -372,7 +292,7 @@ async function normalCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, ob
     let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity)// Actual clock in - out ,lost and late 
     console.log('actualClock:', actualClock)
     let objTime = getTimeLostOrlate(schedule, actualClock);
-
+    resetObjCond();
     objbyCond.schedule = schedule
     objbyCond.flagPaid = flagPaid
     objbyCond.actualClock = actualClock
@@ -389,6 +309,26 @@ async function normalCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, ob
     } else {
         setData2DB('ON', objbyCond, objID)
     }
+}
+
+
+async function otComLeaveAllDay(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+    /* ScheduleNormal , one record by RecordType = 'ON' */
+    console.log('otComLeaveAllDay')
+    let schedule = await findScheduleStartEndLeaveAllDay(listSL, 'OTCOM')   // Schedule start - end 
+    console.log('schedule:', schedule)
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity)// Actual clock in - out ,lost and late 
+    console.log('actualClock:', actualClock)
+    let objHour = getHourOTComAllLeaveDay(listTR, listMstActivity)
+    let objTime = getTimeLostOrlate(schedule, actualClock);
+    resetObjCond();
+    objbyCond.schedule = schedule
+    objbyCond.flagPaid = flagPaid
+    objbyCond.actualClock = actualClock
+    objbyCond.objHour = objHour
+    //objbyCond.objTime = objTime
+    setData2DB('OTComLeaveAllDay', objbyCond, objID)
+
 }
 
 
@@ -409,6 +349,7 @@ async function normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, isOTC
     let objHour = normalWork(tr, listMstActivity, 'ot', actualClock)
 
     let objTime = getTimeLostOrlate(schedule, actualClock);  // get min - hour for case late or lost
+    resetObjCond();
     objbyCond.schedule = schedule
     objbyCond.flagPaid = flagPaid
     objbyCond.actualClock = actualClock
@@ -443,7 +384,7 @@ async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, o
     let tr = await splitActivityTRBySL(listSL, listTR, '2OT', listMstActivity, schedule, scheduleOT)
     let objHour = beforeAfterOT(tr, listMstActivity, actualClock)
 
-
+    resetObjCond();
     objbyCond.schedule = schedule
     objbyCond.flagPaid = flagPaid
     objbyCond.actualClock = actualClock
@@ -505,27 +446,26 @@ async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, o
 // }
 function mapTRbySLDaily(listSL, listTR) {
     let listTRDaily = [];
-    for (let i = 0; i < listSL.length; i++) {
-        let momentActSLEnd = moment(listSL[i].end, format);// sl end
-        let momentActSLStart = moment(listSL[i].start, format);// sl start
-        //listMstActivity.forEach(e => {
-        // if (checkActivityByGrup('Work', listMstActivity, listSL[i].activityName)
-        //     || checkActivityByGrup('Meal', listMstActivity, listSL[i].activityName)) { //case work activity
-        for (let j = 0; j < listTR.length; j++) {
-            let momentActTREnd = moment(listTR[j].end, format);   // tr end
-            let momentActTRStart = moment(listTR[j].start, format);  //tr start
-            if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
-                || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
-                || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
-            ) {
-                //listAcivityTR.work.push(listTR[j])
-                listTRDaily.push(listTR[j])
-            }
+    // for (let i = 0; i < listSL.length; i++) {
+    let momentActSLEnd = moment(listSL[i].end, format);// sl end
+    let momentActSLStart = moment(listSL[i].start, format);// sl start
+    //listMstActivity.forEach(e => {
+    // if (checkActivityByGrup('Work', listMstActivity, listSL[i].activityName)
+    //     || checkActivityByGrup('Meal', listMstActivity, listSL[i].activityName)) { //case work activity
+    for (let j = 0; j < listTR.length; j++) {
+        let momentActTREnd = moment(listTR[j].end, format);   // tr end
+        let momentActTRStart = moment(listTR[j].start, format);  //tr start
+        if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
+            || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
+            || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
+        ) {
+            //listAcivityTR.work.push(listTR[j])
+            listTRDaily.push(listTR[j])
         }
-        //}
     }
+    //}
+    // }
     return listTRDaily
-
 }
 
 
@@ -847,6 +787,39 @@ function beforeAfterOT(listTR, listMstActivity, actualClock) {
 
 }
 
+function getHourOTComAllLeaveDay(listTR, listMstActivity) {
+    console.log(listTR)
+    let hour = {
+        //work: '00:00:00',
+        ot: '00:00:00',
+        isPaid: true
+    }
+
+    console.log('OTComAllLeaveDay')
+    let = [];
+    //let workTime = '00:00';
+    //จะมีแค่ list activity tr work เท่านั้น เพราะเป็นเวลาทำงานปกติ
+    if (isNotEmpty(listTR)) {
+        listTR.forEach(tr => {
+            //listMstActivity.forEach(mstAct => {
+            // if ((tr.activityName == mstAct.activityName) && mstAct.groupType == 'Work') {
+            if (checkActivityByGrup('Work', listMstActivity, tr.activityName)) {
+                hour.ot = activityHourPaid(tr.start, tr.end, hour.ot)
+            }
+
+            //})
+        })
+        if (isNotEmpty(listTR.special)) {
+            listTR.special.forEach(trSpecial => {
+                hour.ot = activityHourPaid(trSpecial.start, trSpecial.end, hour.ot)
+            })
+        }
+    }
+    console.log('workTime:', hour.work)
+    return hour
+
+}
+
 
 function normalWork(listTR, listMstActivity, type, actualClock) {
     console.log(listTR)
@@ -934,6 +907,8 @@ function normalWork(listTR, listMstActivity, type, actualClock) {
         return hour
     }
 }
+
+
 
 function findActualClockFromTR(schedule, listTR, listMstActivity) {
     let actualClockObj = {
@@ -1187,6 +1162,32 @@ async function findScheduleStartEnd(listSL, type) {
     return scheduleObj
 }
 
+async function findScheduleStartEndLeaveAllDay(listSL, type) {
+
+    let scheduleObj = {
+        start: '',
+        end: ''
+    }
+
+    let listMstActivity = await getActivityInfo('ALL');
+
+    if (type == 'OTCOM') {
+        console.log('findScheduleStartEnd normal')
+        let counter = 0;
+        listSL.forEach(e => {
+            if (checkActivityByGrup('Leave', listMstActivity, e.activityName) && counter == 0) {
+                scheduleObj.start = e.start;
+                scheduleObj.end = e.end;
+                counter++
+            } else if (checkActivityByGrup('Leave', listMstActivity, e.activityName) && counter > 0) {
+                scheduleObj.end = e.end;
+            }
+        })
+    }
+
+    return scheduleObj
+}
+
 
 function isOTCompensate(listSL, listTR) {
 
@@ -1202,8 +1203,9 @@ function setID(obj) {
     objID.pin = isNotEmpty(obj.pin) ? obj.pin : ''
     objID.txDetailSLId = isNotEmpty(obj.headerSL) ? obj.headerSL : ''
     objID.txDetailTRId = isNotEmpty(obj.headerTR) ? obj.headerTR : ''
+    objID.scheduleDate = isNotEmpty(obj.scheduleDate) ? obj.scheduleDate : ''
     console.log('objID:', objID)
-    log.debug(objID)
+    logger.debug(objID)
     return objID
 }
 
@@ -1211,8 +1213,8 @@ function setID(obj) {
 getTimeLostOrlate = (schedule, actualClock) => {
 
     let time = {
-        lost: '00:00:00',
-        late: '00:00:00'
+        lost: '00:00',
+        late: '00:00'
     }
     if (actualClock.lost && actualClock.late) {
         time.lost = activityHourPaid(schedule.end, actualClock.end, time.lost)
@@ -1250,11 +1252,10 @@ function isAutoOT(listSL, listTR) {
 
 }
 
-async function setData2condLeave(objSL, isAllDay) {
-    let rec = recordType('LV')
-
+async function setData2condLeave(objSL, isAllDay, scheduleDate) {
+    let rec = new SummaryInfo('LV')
     let start = true;
-    KEYWORD.LEAVE.some(e => {
+    MST.LEAVE.some(e => {
         if (start) {
             objSL.some(act => {
                 if (e.ACTIVITY == act.activityName) {
@@ -1265,42 +1266,53 @@ async function setData2condLeave(objSL, isAllDay) {
             })
         }
     })
-
-    let currentDate = moment(new Date()).format("YYYY-MM-DD")
-    rec.createDt = currentDate
-    rec.createBy = 'Batch'
-
+    rec.createDt = createDateTime
+    rec.shiftFlag = changeFormatBoolean(false)
+    rec.transportFlag = changeFormatBoolean(false)
     if (isAllDay) {
-        rec.scheduleStartDt = objSL[0].start
-        rec.scheduleEndDt = objSL[objSL.length - 1].end
+        rec.scheduleStartDt = changeFormatDate(scheduleDate + " " + objSL[0].start, 'YYYY-MM-DD' + " " + format)//objSL[0].start
+        rec.scheduleEndDt = changeFormatDate(scheduleDate + " " + objSL[objSL.length - 1].end, 'YYYY-MM-DD' + " " + format)//objSL[objSL.length - 1].end
 
-        rec.remark = remark(rec.recordType, rec.scheduleStartDt, rec.scheduleEndDt)
+        rec.remark = remark(rec.recordType, objSL[0].start, objSL[objSL.length - 1].end)
 
-    } else if (!isAllDay) {
-        let lsitSLLeave = [];
-        let listMstActivityLeave = await getActivityInfo('Leave');
-        objSL.forEach(e => {
-            if (checkActivityByGrup('Leave', listMstActivityLeave, e.activityName)) {
-                lsitSLLeave.push(e)
-            }
-        })
-
-        rec.remark = remark(rec.recordType, lsitSLLeave[0].start, lsitSLLeave[0].stop)
     }
+    // else if (!isAllDay) {
+    //     let lsitSLLeave = [];
+    //     let listMstActivityLeave = await getActivityInfo('Leave');
+    //     objSL.forEach(e => {
+    //         if (checkActivityByGrup('Leave', listMstActivityLeave, e.activityName)) {
+    //             lsitSLLeave.push(e)
+    //         }
+    //     })
+
+    //     rec.remark = remark(rec.recordType, lsitSLLeave[0].start, lsitSLLeave[0].stop)
+    // }
     return rec
 }
 
-
-function setData2condAllDaySpecial(objSL, isOverlap) {
+function setData2condLostAllDay(objSL, isOverlap, scheduleDate) {
     console.log('setData2condAllDaySpecial')
-    let rec = recordType('ON')
+    let rec = new SummaryInfo('ON')
+    rec.scheduleStartDt = changeFormatDate(scheduleDate + " " + objSL[0].start, 'YYYY-MM-DD' + " " + format)//objSL[0].start
+    rec.scheduleEndDt = changeFormatDate(scheduleDate + " " + objSL[objSL.length - 1].end, 'YYYY-MM-DD' + " " + format)//objSL[objSL.length - 1].end
+    rec.shiftFlag = changeFormatBoolean(false)
+    rec.transportFlag = changeFormatBoolean(false)
+    rec.createDt = createDateTime
+    rec.remark = remark('Lost', objSL[0].start, objSL[objSL.length - 1].end)
+    return rec
+}
+
+function setData2condAllDaySpecial(objSL, isOverlap, scheduleDate) {
+    console.log('setData2condAllDaySpecial')
+    let rec = new SummaryInfo('ON')
     let flagPaid = hasShiftOrTransport(objSL, objSL)
-    rec.scheduleStartDt = objSL[0].start
-    rec.scheduleEndDt = objSL[objSL.length - 1].end
-    rec.shiftFlag = flagPaid.shift
-    rec.transportFlag = flagPaid.transport
-    rec.actualClockinDt = objSL[0].start
-    rec.actualClockoutDt = objSL[objSL.length - 1].end
+    rec.scheduleStartDt = changeFormatDate(scheduleDate + " " + objSL[0].start, 'YYYY-MM-DD' + " " + format)
+    rec.scheduleEndDt = changeFormatDate(scheduleDate + " " + objSL[objSL.length - 1].end, 'YYYY-MM-DD' + " " + format)
+    rec.shiftFlag = changeFormatBoolean(flagPaid.shift)
+    rec.transportFlag = changeFormatBoolean(flagPaid.transport)
+    rec.actualClockinDt = changeFormatDate(scheduleDate + " " + objSL[0].start, 'YYYY-MM-DD' + " " + format)
+    rec.actualClockoutDt = changeFormatDate(scheduleDate + " " + objSL[objSL.length - 1].end, 'YYYY-MM-DD' + " " + format)
+    rec.createDt = createDateTime
     return rec
 }
 
@@ -1311,62 +1323,99 @@ function remark(word, start, end) {
 }
 
 
-isLeaveActivity = async (listSL) => {
-    let isLeave = false
-    let listMstActivityLeave = await getActivityInfo('Leave');
-    listSL.some(e => {
-        if (checkActivityByGrup('Leave', listMstActivityLeave, e.activityName)) {
-            isLeave = true
-            return true
+isLeaveActivity = (listSL) => {
+    return new Promise(async (resolve, reject) => {
+        let isLeave = false
+        let listMstActivityLeave = await getActivityInfo('Leave');
+        listSL.some(e => {
+            if (checkActivityByGrup('Leave', listMstActivityLeave, e.activityName)) {
+                isLeave = true
+                return true
+            }
+        })
+        resolve(isLeave)
+    })
+}
+
+isLeaveActivityAllDay = (listSL) => {
+    return new Promise(async (resolve, reject) => {
+        let isLeaveAllDay = true
+        let listMstActivity = await getActivityInfo('ALL');
+        let countMeal = 0;
+        listSL.some(e => {
+            if (checkActivityByGrup('Meal', listMstActivity, e.activityName)) {
+                countMeal++
+            }
+
+            if (!checkActivityByGrup('Leave', listMstActivity, e.activityName) && !checkActivityByGrup('Meal', listMstActivity, e.activityName)) {
+                isLeaveAllDay = false
+                return true
+            }
+
+        })
+
+        if (countMeal == 1 && isLeaveAllDay) {
+            resolve(true)
+        } else {
+            resolve(false)
         }
     })
-    return isLeave
 }
 
 //call RDP 
-isHoliday = (param) => {
-
-    // param.start
-    // param.end
-    // paran.active
-
-    return param
+async function isHoliday(start, end) {
+    return new Promise((resolve, reject) => {
+        rdpService.getHolidayByDate(start, end)
+            .then(holidayList => {
+                if (holidayList.GET_HOLIDAYSResult == undefined) {
+                    resolve(false)
+                } else {
+                    // resolve(holidayList.GET_HOLIDAYSResult.Holiday)
+                    resolve(true)
+                }
+            })
+            .catch(err => {
+                reject(err)
+                logger.error(err);
+            });
+    })
 }
 
 
 //call activityInfo
-getActivityInfo = (param) => {
-    if (param == 'ALL')
-        return infoActivity.
-            findAll({
-                include: [{
-                    all: true
-                }], raw: true,
-            })
-    else {
-        console.log('groupType:', param)
-        return infoActivity.
-            findAll({
-                where: {
-                    groupType: param
-                },
-                include: [{
-                    all: true
-                }], raw: true,
-            })
-    }
-    //var nodedata = node.values;
-    // .then((listAct) => { return listAct.dataValues })
-    // .catch((error) => console.log(error))
+function getActivityInfo(param) {
+    return new Promise((resolve, reject) => {
+        if (param == 'ALL')
+            resolve(
+                infoActivity.
+                    findAll({
+                        include: [{
+                            all: true
+                        }], raw: true,
+                    })
+            )
+        else {
+            console.log('groupType:', param)
+            resolve(
+                infoActivity.
+                    findAll({
+                        where: {
+                            groupType: param
+                        },
+                        include: [{
+                            all: true
+                        }], raw: true,
+                    })
+            )
+        }
+        //var nodedata = node.values;
+        // .then((listAct) => { return listAct.dataValues })
+        // .catch((error) => console.log(error))
+    })
 }
 
 
 
-
-function tooLate() {
-
-
-}
 
 
 function sortTime(list, overlap) {
@@ -1402,11 +1451,14 @@ function sortTime(list, overlap) {
 
 
 function setData2DB(type, objbyCond, objID) {
-    let rec = recordType(type)
+    //let rec = recordType(type)
+    let rec = new SummaryInfo(type)
     let modelSummaryDetail = [];
     rec.pin = objID.pin
     rec.txDetailSLId = objID.txDetailSLId
     rec.txDetailTRId = objID.txDetailTRId
+    rec.recordDate = objID.scheduleDate
+    rec.createDt = createDateTime
 
     if (type == 'ON') {
         if (objbyCond.objHour.isPaid) {
@@ -1414,25 +1466,25 @@ function setData2DB(type, objbyCond, objID) {
         }
         if (isNotEmpty(objbyCond.actualClockOT)) {
             if (isNotEmpty(objbyCond.actualClockOT.start) && isNotEmpty(objbyCond.actualClockOT.end)) {
-                rec.otStartDt = objbyCond.actualClockOT.start
-                rec.otEndDt = objbyCond.actualClockOT.end
+                rec.otStartDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClockOT.start, 'YYYY-MM-DD' + " " + format)
+                rec.otEndDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClockOT.end, 'YYYY-MM-DD' + " " + format)
             }
         }
-        let currentDate = moment(new Date()).format("YYYY-MM-DD");
-        rec.createDt = currentDate;
-        rec.scheduleStartDt = objbyCond.schedule.start;
-        rec.scheduleEndDt = objbyCond.schedule.end;
+        // let currentDate = moment(new Date()).format("YYYY-MM-DD");
+        // rec.createDt = currentDate;
+        rec.scheduleStartDt = changeFormatDate(rec.recordDate + " " + objbyCond.schedule.start, 'YYYY-MM-DD' + " " + format)
+        rec.scheduleEndDt = changeFormatDate(rec.recordDate + " " + objbyCond.schedule.end, 'YYYY-MM-DD' + " " + format)
         if (isNotEmpty(objbyCond.actualClock)) {
             if (isNotEmpty(objbyCond.actualClock.start) && isNotEmpty(objbyCond.actualClock.end)) {
-                rec.actualClockinDt = objbyCond.actualClock.start;
-                rec.actualClockoutDt = objbyCond.actualClock.end;
+                rec.actualClockinDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClock.start, 'YYYY-MM-DD' + " " + format)
+                rec.actualClockoutDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClock.end, 'YYYY-MM-DD' + " " + format)
             }
         }
         rec.lateTime = objbyCond.objTime.late
         rec.lostTime = objbyCond.objTime.lost
 
-        rec.shiftFlag = objbyCond.flagPaid.shift
-        rec.transportFlag = objbyCond.flagPaid.transport
+        rec.shiftFlag = changeFormatBoolean(objbyCond.flagPaid.shift)
+        rec.transportFlag = changeFormatBoolean(objbyCond.flagPaid.transport)
         rec.ot30 = '0.00';
         rec.recordMonth = '';
         rec.remark = '';
@@ -1440,21 +1492,23 @@ function setData2DB(type, objbyCond, objID) {
         modelSummaryDetail.push(rec)
 
         if (objbyCond.is2OT) {
-            let beforeOT = recordType('2OT')
-            let afterOT = recordType('2OT')
+            let beforeOT = new SummaryInfo('ON')
+            let afterOT = new SummaryInfo('ON')
+            // let beforeOT = recordType('2OT')
+            // let afterOT = recordType('2OT')
             if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
                 let otBefore = objbyCond.actualClockOT.actualClockBefore;
                 if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
-                    beforeOT.otStartDt = otBefore.start
-                    beforeOT.otEndDt = otBefore.end
+                    beforeOT.otStartDt = changeFormatDate(rec.recordDate + " " + otBefore.start, 'YYYY-MM-DD' + " " + format)
+                    beforeOT.otEndDt = changeFormatDate(rec.recordDate + " " + otBefore.end, 'YYYY-MM-DD' + " " + format)
                 }
             }
 
             if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
                 let otAfter = objbyCond.actualClockOT.actualClockAfter;
                 if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
-                    afterOT.otStartDt = otAfter.start
-                    afterOT.otEndDt = otAfter.end
+                    afterOT.otStartDt = changeFormatDate(rec.recordDate + " " + otAfter.start, 'YYYY-MM-DD' + " " + format)
+                    afterOT.otEndDt = changeFormatDate(rec.recordDate + " " + otAfter.end, 'YYYY-MM-DD' + " " + format)
                 }
             }
 
@@ -1469,43 +1523,49 @@ function setData2DB(type, objbyCond, objID) {
             modelSummaryDetail.push(beforeOT)
             modelSummaryDetail.push(afterOT)
         }
-    }
-    // else if (type == 'AutoOT') {
-    //     rec.pin = objID.pin
-    //     rec.txDetailSLId = objID.txDetailSLId
-    //     rec.txDetailTRId = objID.txDetailTRId
-    // }
-    // else if (type == 'OFF') {
-    //     rec.pin = objID.pin
-    //     rec.txDetailSLId = objID.txDetailSLId
-    //     rec.txDetailTRId = objID.txDetailTRId
+        console.log(modelSummaryDetail)
 
-    // }
+        return saveData2DB(rec.toObject())
+    }
+    else if (type == 'AutoOT') {
+        rec.pin = objID.pin
+        rec.txDetailSLId = objID.txDetailSLId
+        rec.txDetailTRId = objID.txDetailTRId
+        modelSummaryDetail.push(rec)
+        return saveData2DB(rec.toObject())
+    }
+    else if (type == 'OFF') {
+        rec.pin = objID.pin
+        rec.txDetailSLId = objID.txDetailSLId
+        rec.txDetailTRId = objID.txDetailTRId
+        modelSummaryDetail.push(rec)
+        return saveData2DB(rec.toObject())
+        //console.log(modelSummaryDetail)
+    }
     else if (type == 'OTCOM') {
         //  if (objbyCond.objHour.isPaid) {
 
         // }
         if (isNotEmpty(objbyCond.actualClockOT)) {
             if (isNotEmpty(objbyCond.actualClockOT.start) && isNotEmpty(objbyCond.actualClockOT.end)) {
-                rec.otStartDt = objbyCond.actualClockOT.start
-                rec.otEndDt = objbyCond.actualClockOT.end
+                rec.otStartDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClockOT.start, 'YYYY-MM-DD' + " " + format)
+                rec.otEndDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClockOT.end, 'YYYY-MM-DD' + " " + format)
             }
         }
-        let currentDate = moment(new Date()).format("YYYY-MM-DD");
-        rec.createDt = currentDate;
-        rec.scheduleStartDt = objbyCond.schedule.start;
-        rec.scheduleEndDt = objbyCond.schedule.end;
+        rec.createDt = createDateTime;
+        rec.scheduleStartDt = changeFormatDate(rec.recordDate + " " + objbyCond.schedule.start, 'YYYY-MM-DD' + " " + format)
+        rec.scheduleEndDt = changeFormatDate(rec.recordDate + " " + objbyCond.schedule.end, 'YYYY-MM-DD' + " " + format)
         if (isNotEmpty(objbyCond.actualClock)) {
             if (isNotEmpty(objbyCond.actualClock.start) && isNotEmpty(objbyCond.actualClock.end)) {
-                rec.actualClockinDt = objbyCond.actualClock.start;
-                rec.actualClockoutDt = objbyCond.actualClock.end;
+                rec.actualClockinDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClock.start, 'YYYY-MM-DD' + " " + format)
+                rec.actualClockoutDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClock.end, 'YYYY-MM-DD' + " " + format)
             }
         }
         rec.lateTime = objbyCond.objTime.late
         rec.lostTime = objbyCond.objTime.lost
 
-        rec.shiftFlag = objbyCond.flagPaid.shift
-        rec.transportFlag = objbyCond.flagPaid.transport
+        rec.shiftFlag = changeFormatBoolean(objbyCond.flagPaid.shift)
+        rec.transportFlag = changeFormatBoolean(objbyCond.flagPaid.transport)
         rec.ot10 = '8:00';  // defualt 8 hour , standard work
         rec.ot15 = '0.00';
         rec.ot30 = objbyCond.objHour.ot;
@@ -1516,197 +1576,347 @@ function setData2DB(type, objbyCond, objID) {
         if (objbyCond.is2OT) {
             let beforeOT = recordType('2OT')
             let afterOT = recordType('2OT')
-            actualClockBefore
             if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
                 let otBefore = objbyCond.actualClockOT.actualClockBefore;
                 if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
-                    beforeOT.otStartDt = otBefore.start
-                    beforeOT.otEndDt = otBefore.end
+                    beforeOT.otStartDt = changeFormatDate(rec.recordDate + " " + otBefore.start, 'YYYY-MM-DD' + " " + format)
+                    beforeOT.otEndDt = changeFormatDate(rec.recordDate + " " + otBefore.end, 'YYYY-MM-DD' + " " + format)
                 }
             }
 
             if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
                 let otAfter = objbyCond.actualClockOT.actualClockAfter;
                 if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
-                    afterOT.otStartDt = otAfter.start
-                    afterOT.otEndDt = otAfter.end
+                    afterOT.otStartDt = changeFormatDate(rec.recordDate + " " + otAfter.start, 'YYYY-MM-DD' + " " + format)
+                    afterOT.otEndDt = changeFormatDate(rec.recordDate + " " + otAfter.end, 'YYYY-MM-DD' + " " + format)
                 }
             }
 
             modelSummaryDetail.push(beforeOT)
             modelSummaryDetail.push(afterOT)
         }
+
+        return saveData2DB(rec.toObject())
     }
-    let pass = false
-    modelSummaryDetail.every(e => {
-        if (validatePass(e)) {
-            pass = true
-            console.log('validatePass:', validatePass)
-        } else {
-            return false
+
+    else if (type == 'OTComLeaveAllDay') {
+        if (objbyCond.objHour.isPaid) {
+            rec.ot10 = objbyCond.objHour.ot;
         }
-    })
-    try {
-        if (pass) {
-            console.log('rec:', rec)
-            // saveData2DB(rec)
+        // if (isNotEmpty(objbyCond.actualClockOT)) {
+        //     if (isNotEmpty(objbyCond.actualClockOT.start) && isNotEmpty(objbyCond.actualClockOT.end)) {
+        //         rec.otStartDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClockOT.start, 'YYYY-MM-DD' + " " + format)
+        //         rec.otEndDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClockOT.end, 'YYYY-MM-DD' + " " + format)
+        //     }
+        // }
+        // // let currentDate = moment(new Date()).format("YYYY-MM-DD");
+        // // rec.createDt = currentDate;
+        rec.scheduleStartDt = changeFormatDate(rec.recordDate + " " + objbyCond.schedule.start, 'YYYY-MM-DD' + " " + format)
+        rec.scheduleEndDt = changeFormatDate(rec.recordDate + " " + objbyCond.schedule.end, 'YYYY-MM-DD' + " " + format)
+        if (isNotEmpty(objbyCond.actualClock)) {
+            if (isNotEmpty(objbyCond.actualClock.start) && isNotEmpty(objbyCond.actualClock.end)) {
+                rec.actualClockinDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClock.start, 'YYYY-MM-DD' + " " + format)
+                rec.actualClockoutDt = changeFormatDate(rec.recordDate + " " + objbyCond.actualClock.end, 'YYYY-MM-DD' + " " + format)
+            }
         }
+        rec.lateTime = objbyCond.objTime.late
+        rec.lostTime = objbyCond.objTime.lost
+
+        rec.shiftFlag = changeFormatBoolean(objbyCond.flagPaid.shift)
+        rec.transportFlag = changeFormatBoolean(objbyCond.flagPaid.transport)
+        rec.ot30 = '0.00';
+        rec.recordMonth = '';
+        rec.remark = '';
+        rec.createBy = 'Batch';
+        // modelSummaryDetail.push(rec)
+
+        // console.log(modelSummaryDetail)
+
+        return saveData2DB(rec.toObject())
+
+
+
     }
-    catch (e) {
-        log.error(e)
-    }
+    // let pass = false
+    // modelSummaryDetail.every(e => {
+    //     if (validatePass(e)) {
+    //         pass = true
+    //     } else {
+    //         return false
+    //     }
+    // })
+    // try {
+    //     if (pass) {
+    //         console.log('rec:', rec)
+    //         // saveData2DB(rec)
+    //     }
+    // }
+    // catch (e) {
+    //     log.error(e)
+    // }
 
 }
 
 
 function saveData2DB(modelSummaryDetail) {
 
-    // txSummaryDetail.create(modelSummaryDetail)
-    //     .then(todo => res.status(200).send(todo))
-    //     .catch(error => res.status(400).send(error));
 
-    txSummaryDetail.bulkCreate(modelSummaryDetail, { validate: true })
-        .then(todo => res.status(200).send(todo))
-        .catch(error => res.status(400).send(error));
+
+    let whereInfosummary = {
+        pin: modelSummaryDetail.pin,
+        recordDt: moment(modelSummaryDetail.recordDate).format('YYYY-MM-DD'),
+    }
+    if (isNotEmpty(modelSummaryDetail.txDetailSLId)) {
+        whereInfosummary['slHeaderId'] = modelSummaryDetail.txDetailSLId
+    }
+    if (isNotEmpty(modelSummaryDetail.txDetailTRId)) {
+        whereInfosummary['trHeaderId'] = modelSummaryDetail.txDetailTRId
+    }
+    console.log(whereInfosummary)
+    return new Promise((resolve, reject) => {
+        txSummaryDetail.create(modelSummaryDetail)
+            .then(obj => {
+                infoSummaryCheck.update({
+                    genSumFlag: 'Y',
+                    genSumStartDt: moment().format('YYYY-MM-DD' + " " + format),
+                    genSumEndDt: moment().format('YYYY-MM-DD' + " " + format),
+                }, {
+                        where: whereInfosummary,
+                        returning: true,
+                        plain: true
+                    })
+                    .then(function (result) {
+                        console.log(result);
+                        resolve(true)
+                        // result = [x] or [x, y]
+                        // [x] if you're not using Postgres
+                        // [x, y] if you are using Postgres
+                    });
+            })
+            .catch(error => { console.log(error); reject(new Error('insert or update info summary fail')) });
+    })
+    // txSummaryDetail.bulkCreate(modelSummaryDetail, { validate: true })
+    //      .then(todo => console.log(todo))
+    //      .catch(error => console.log(error));
 }
 
-async function mapData2Obj(summaryCheck) {
+function mapData2Obj(summaryCheck, mapAidToPin) {
+    logger.debug('start mapData2Obj');
     let employeeScheList = []
     let mapTR = new Map();
-    try {
-        const listTR = await getTRDetailModel(summaryCheck);
-        //log.debug(listTR)
-        //console.log('listTR:', listTR.length)
-        // console.log('listTR:', listTR)
-        const listSL = await getSLDetailModel(summaryCheck)
-        //log.debug(listSL)
-        //console.log('listSL:', listSL.length)
-        // console.log('listSL:', listSL)
-        if (!isEmptyArray(listTR)) {
-            for (let tr of listTR) {
-                if (isNotEmpty(tr.ssn) && !isNotEmpty(mapTR.get(tr.ssn))) { //new ssn
-                    let listEmployeeTR = getNewObjbyType('InitObjTRMap')
-                    listEmployeeTR.pin = tr.ssn
-                    listEmployeeTR.headerTR = tr.headerId
-                    listEmployeeTR.organizeName = tr.organizeName
-                    listEmployeeTR.employeeName = tr.agentName
-                    listEmployeeTR.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
-                    mapTR.set(listEmployeeTR.pin, listEmployeeTR);  // change obj to map 
-                } else if (isNotEmpty(tr.ssn) && isNotEmpty(mapTR.get(tr.ssn))) {
-                    let tempMap = mapTR.get(tr.ssn);
-                    tempMap.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
-                    mapTR.set(tr.ssn, tempMap);
-                }
-            }//1152
-            console.log('mapTR:', mapTR.size)  //select ssn from tx_tr_detail where ssn is not null group by ssn order by ssn asc for check
-        } else {
-            console.log('empty TR detail')
-        }
-        if (isNotEmpty(listSL)) {
-            for (let sl of listSL) {
-                if ((isEmptyArray(employeeScheList) && isNotEmpty(sl.ssn)) || (employeeScheList.findIndex(e => { return e.pin == sl.ssn })) < 0 && isNotEmpty(sl.ssn)) {
-                    let list = getNewObjbyType('InitObj')
-                    //console.log(list.activitySL)
-                    list.pin = sl.ssn
-                    list.tz = sl.time_zone
-                    list.headerSL = sl.headerId
-                    list.scheduleDate = sl.scheduleDate
-                    //check overlap
-                    // let execDate = moment(sl.execDate, "YYYY-MM-DD" + format)
-                    // let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD" + format)
-                    let execDate = moment(sl.execDate, "YYYY-MM-DD")
-                    let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD")
-                    // console.log("overlap:" + execDate.isSame(scheduleDate))
-                    list.overlapTime = execDate.isSame(scheduleDate) ? false : true
+    return new Promise(async (resolve, reject) => {
+        try {
 
-                    list.activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
-                    //console.log('isNotEmpty(mapTR):', isNotEmpty(mapTR.get(sl.ssn)))
-                    list.activityTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).activity : '';
-                    list.organizeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).organizeName : '';
-                    list.employeeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).employeeName : '';
-                    list.headerTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).headerTR : '';
-                    employeeScheList.push(list)   // mst obj SL,TR
-                } else {
-                    let indexExistPin = employeeScheList.findIndex(e => { return e.pin == sl.ssn })
-                    // console.log('indexExistPin:', indexExistPin)
-                    if (indexExistPin >= 0) {
-                        employeeScheList[indexExistPin].activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
-                        //employeeScheList[indexExistPin].activityTR = isNotEmpty(mapTR.get(sl.pin)) ? mapTR.get(sl.pin).activity : '';
+            const listSL = await getSLDetailModel(summaryCheck)
+            logger.debug('listSL length:' + listSL.length);
+
+            let isOverlap = false;
+            if (isNotEmpty(listSL)) {
+                isOverlap = getOverlapDate(listSL)
+                console.log('isOverlap:', isOverlap)
+            }
+
+            const listTR = await getTRDetailModel(summaryCheck, isOverlap);
+            console.log(listTR)
+            logger.debug('listTR length:' + listTR.length);
+
+            console.log(listSL)
+            if (!isEmptyArray(listTR)) {
+                for (let tr of listTR) {
+                    if (isNotEmpty(tr.ssn) && !isNotEmpty(mapTR.get(tr.ssn))) { //new ssn
+                        let listEmployeeTR = getNewObjbyType('InitObjTRMap')
+                        listEmployeeTR.pin = tr.ssn
+                        listEmployeeTR.headerTR = tr.headerId
+                        listEmployeeTR.organizeName = tr.organizeName
+                        listEmployeeTR.employeeName = tr.agentName
+                        listEmployeeTR.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
+                        mapTR.set(listEmployeeTR.pin, listEmployeeTR);  // change obj to map 
+                    } else if (isNotEmpty(tr.ssn) && isNotEmpty(mapTR.get(tr.ssn))) {
+                        let tempMap = mapTR.get(tr.ssn);
+                        tempMap.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
+                        mapTR.set(tr.ssn, tempMap);
+                    }
+                }//1152
+                console.log('mapTR:', mapTR.size)  //select ssn from tx_tr_detail where ssn is not null group by ssn order by ssn asc for check
+                logger.debug('mapTR Size:' + mapTR.size);
+            } else {
+                console.log('empty TR detail')
+                logger.debug('empty TR detail');
+            }
+            if (isNotEmpty(listSL)) {
+                for (let sl of listSL) {
+                    if ((isEmptyArray(employeeScheList) && isNotEmpty(sl.ssn)) || (employeeScheList.findIndex(e => { return e.pin == sl.ssn })) < 0 && isNotEmpty(sl.ssn)) {
+                        let list = getNewObjbyType('InitObj')
+                        //console.log(list.activitySL)
+                        list.pin = sl.ssn
+                        list.tz = sl.time_zone
+                        list.headerSL = sl.headerId
+                        list.scheduleDate = sl.scheduleDate
+                        //check overlap
+                        // let execDate = moment(sl.execDate, "YYYY-MM-DD" + format)
+                        // let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD" + format)
+                        // let execDate = moment(sl.execDate, "YYYY-MM-DD")
+                        // let scheduleDate = moment(sl.scheduleDate, "YYYY-MM-DD")
+                        // console.log("overlap:" + execDate.isSame(scheduleDate))
+                        list.overlapTime = isOverlap
+
+                        list.activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
+                        //console.log('isNotEmpty(mapTR):', isNotEmpty(mapTR.get(sl.ssn)))
+                        list.activityTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).activity : '';
+                        list.organizeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).organizeName : '';
+                        list.employeeName = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).employeeName : '';
+                        list.headerTR = isNotEmpty(mapTR.get(sl.ssn)) ? mapTR.get(sl.ssn).headerTR : '';
+                        employeeScheList.push(list)   // mst obj SL,TR
+                    } else {
+                        let indexExistPin = employeeScheList.findIndex(e => { return e.pin == sl.ssn })
+                        // console.log('indexExistPin:', indexExistPin)
+                        if (indexExistPin >= 0) {
+                            employeeScheList[indexExistPin].activitySL.push({ start: sl.startDt, end: sl.stopDt, activityName: sl.activity })
+                            //employeeScheList[indexExistPin].activityTR = isNotEmpty(mapTR.get(sl.pin)) ? mapTR.get(sl.pin).activity : '';
+                        }
                     }
                 }
+                employeeScheList[0].pin = isNotEmpty(mapAidToPin.get(employeeScheList[0].pin)) ? mapAidToPin.get(employeeScheList[0].pin) : employeeScheList = []
+                console.log('employeeScheList:', employeeScheList.length)
             }
-            console.log('employeeScheList:', employeeScheList.length) // expect 1880
+            else {
+                console.log('empty SL detail')
+                logger.debug('empty SL detail');
+                // reject(new Error("Empty SL detail"))
+            }
+        } catch (e) {
+            logger.error('Error:' + e);
+            reject(new Error("Can not map obj SL TR"))
         }
-        else {
-            console.log('empty SL detail')
+
+        resolve(employeeScheList)
+    })
+
+}
+
+const getOverlapDate = (listSL) => {
+    let scheduleDate = moment(listSL[0].scheduleDate, "YYYY-MM-DD")
+    for (let sl of listSL) {
+        let execDate = moment(sl.execDate, "YYYY-MM-DD")
+        if (!(scheduleDate.isSame(execDate))) {
+            return true
         }
-    } catch (e) {
-        console.log('error:', e.error)
+    }
+    return false
+}
+
+
+const getMapPinAid = (infoSummaryList) => {
+    let map = {
+        aidToPin: new Map(),
+        pinToAid: new Map(),
     }
 
-    return employeeScheList
-
+    infoSummaryList.forEach(e => {
+        map.pinToAid.set(e.pin, e.ssn)
+        map.aidToPin.set(e.ssn, e.pin)
+    })
+    return map
 }
 
 const getSLDetailModel = (rec) => {
-    return objSL
+    // return obj.cond.normalOver.overlap.objSL
+    //return obj.cond.beforeAfterOT.daily.objSL
+    //return obj.cond.off.objSL
+    //return obj.cond.special.daily.objSL
     let yesterday = moment(rec.recordDt).format('YYYY-MM-DD');
-    let dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
-    return txSlDetail.findAll({
-        where: {
-            scheduleDate: yesterday,
-            // scheduleDate: dayBeforeYesterday,
-            headerId: rec.slHeaderId,
-            ssn: rec.pin,
+    // let dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
+    return new Promise((resolve, reject) => {
+        txSlDetail.findAll({
+            where: {
+                scheduleDate: yesterday,
+                // scheduleDate: dayBeforeYesterday,
+                headerId: rec.slHeaderId,
+                ssn: rec.ssn,
 
-            // ssn: '32327'
-        },
-        //        limit: 2,
-        // include: [{
-        //     all: true   // จะ query ตาม associate ที่เกี่ยวข้องขึ้นมาด้วย 
-        // }]
-        // , raw: false   // จะ query raw  value ตาม database ซึ่งจะไม่ทำ function get ที่ config ไว้ทีตัว model 
-    }).then((todos) => { return nodeData = todos.map((node) => node.get({ plain: true })); console.log(node) })
-        .catch((error) => { console.log(error) });
+                // ssn: '32327'
+            }, order: [
+                ['scheduleDate', 'ASC'],
+                ['startDt', 'ASC'],
+            ],
+            //        limit: 2,
+            // include: [{
+            //     all: true   // จะ query ตาม associate ที่เกี่ยวข้องขึ้นมาด้วย 
+            // }]
+            // , raw: false   // จะ query raw  value ตาม database ซึ่งจะไม่ทำ function get ที่ config ไว้ทีตัว model 
+        }).then((todos) => { resolve(nodeData = todos.map((node) => node.get({ plain: true }))); })
+            .catch((error) => { logger.debug(error); reject(new Error("Can not load SL")) });
 
 
+    })
 }
 
-const getTRDetailModel = (rec) => {
-    return objTR
+const getTRDetailModel = (rec, overlap) => {
+    // return obj.cond.normalOver.overlap.objTR
+    //return obj.cond.beforeAfterOT.daily.objTR
+    // return obj.cond.off.objTR
+    //return obj.cond.special.daily.objTR
     let yesterday = moment(rec.recordDt).format('YYYY-MM-DD');
-    let dayBeforeYesterday = moment(rec.recordDt).subtract(2, 'days').format('YYYY-MM-DD');
-    return txTrDetail.findAll({
-        where: {
-            // scheduleDate: rec.recordDt,
-            // scheduleDate: dayBeforeYesterday,
-            [Op.or]: [{ scheduleDate: yesterday }, { scheduleDate: dayBeforeYesterday }],
-            headerId: rec.trHeaderId,
-            ssn: rec.pin,
-            //headerId: '1081',
-            //ssn: '32327'
-        }
-    }).then((todos) => { return nodeData = todos.map((node) => node.get({ plain: true })); })
-        .catch((error) => { console.log(error) });
+    let dayBeforeYesterday = moment(rec.recordDt).subtract(1, 'days').format('YYYY-MM-DD');
 
+    //let whereOverlap = {}
+    let whereCond = {}
+
+    if (overlap) {
+
+        whereCond = {
+            [Op.or]: [{ scheduleDate: yesterday }, { scheduleDate: dayBeforeYesterday }],
+            ssn: rec.ssn
+        }
+
+    } else {
+        // let schedule = {};
+        // schedule["scheduleDate"] = yesterday
+        whereCond["scheduleDate"] = yesterday
+        whereCond["ssn"] = rec.ssn
+        whereCond["headerId"] = rec.trHeaderId
+
+        // [Op.or]:{
+        //     scheduleDate:yesterday
+
+        // }
+    }
+    console.log('whereCond:', whereCond)
+    return new Promise((resolve, reject) => {
+        txTrDetail.findAll({
+            where: whereCond,
+            order: [
+                ['scheduleDate', 'ASC'],
+                ['startDt', 'ASC'],
+            ]
+        }).then((todos) => { resolve(nodeData = todos.map((node) => node.get({ plain: true }))); })
+            .catch((error) => { logger.error(error); reject(new Error("Can not load TR")) });
+
+    })
 }
 
 const getInfoSummaryCheckModel = () => {
-
+    if (logger.isDebugEnabled()) {
+        logger.debug('start getInfoSummaryCheckModel');
+    }
     let yesterday = moment('2017-11-12').subtract(1, 'days').format('YYYY-MM-DD');
     let dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
     return infoSummaryCheck.findAll({
-        attributes: ['pin', 'recordDt', 'slFlag', 'trFlag', 'slHeaderId', 'trHeaderId', 'genSumStartDt', 'genSumEndDt'],
+        attributes: ['pin', 'ssn', 'recordDt', 'slFlag', 'trFlag', 'slHeaderId', 'trHeaderId', 'genSumStartDt', 'genSumEndDt'],
         where: {
             genSumFlag: 'N',
-            recordDt: yesterday,
-            // recordDt: {
-            //     [Op.lte]: yesterday
-            // },
-        },
-        limit: 1,
-    }).then((todos) => { return nodeData = todos.map((node) => node.get({ plain: true })); })
-        .catch((error) => { console.log(error) });
+            // recordDt: yesterday,
+            recordDt: {
+                [Op.lte]: yesterday
+            },
+        }
+        //,limit: 20,
+    }).then((todos) => {
+        if (logger.isDebugEnabled()) {
+            logger.debug('End getInfoSummaryCheckModel');
+        }
+        return nodeData = todos.map((node) => node.get({ plain: true }));
+    }).catch((error) => { console.log(error) });
 }
 
 
@@ -1786,7 +1996,7 @@ function validatePass(record) {
     // }
 
     if (!isNotEmpty(record.pin)) {
-        log.debug("pin is Empty")
+        logger.debug("pin is Empty")
         return false
     }
     // if (record.scheduleStartDt) {
@@ -1808,7 +2018,7 @@ function validatePass(record) {
 
     // }
     if (!isNotEmpty(record.recordType)) {
-        log.debug("recordType is Empty")
+        logger.debug("recordType is Empty")
         return false
     }
     // if (record.shiftFlag) {
@@ -1827,7 +2037,7 @@ function validatePass(record) {
 
     // }
     if (!isNotEmpty(record.recordDate)) {
-        log.debug("recordDate is Empty")
+        logger.debug("recordDate is Empty")
         return false
     } else {
         record.recordDate = moment(record.recordDate).format("YYYY-MM-DD")
@@ -1839,15 +2049,15 @@ function validatePass(record) {
 
     // }
     if (!isNotEmpty(record.useFlag)) {
-        log.debug("useFlag is Empty")
+        logger.debug("useFlag is Empty")
         return false
     }
     if (!isNotEmpty(record.createBy)) {
-        log.debug("createBy is Empty")
+        logger.debug("createBy is Empty")
         return false
     }
-    if (record.createDt) {
-        log.debug("createDt is Empty")
+    if (!isNotEmpty(record.createDt)) {
+        logger.debug("createDt is Empty")
         return false
     } else {
         record.createDt = moment(record.createDt).format("YYYY-MM-DD" + format)
@@ -1883,6 +2093,7 @@ function findGrupType(arr, listMstActivity) {
 //ถ้าไม่มีก็ตัดทิ้ง ถ้ามีไป  check ไฟล์ TR และ clockin out ตามลำดับว่าครบ8 ชม ไหม
 
 async function spiltData(data, symbol) {
+
     await arrayToTxtFile(sumaryDetailObj, './test-output.txt', err => {
         if (err) {
             console.error(err)
@@ -1894,11 +2105,11 @@ async function spiltData(data, symbol) {
 }
 
 
-function hasShiftOrTransport(listSL, listTR) {
+function hasShiftOrTransport(listSL, listTR, overlapFlag, scheduleDate) {
 
     let flagPaid = { shift: false, transport: false }
-    let hasSchedule = checkSchedule(listSL)
-    let isPaid = checkTimeRecord(listTR)
+    let hasSchedule = checkSchedule(listSL, overlapFlag, scheduleDate)
+    let isPaid = checkTimeRecord(listTR, overlapFlag, scheduleDate)
     if (hasSchedule.shift && isPaid.shift && hasSchedule.transport && isPaid.transport) {
         flagPaid.shift = true
         flagPaid.transport = true
@@ -1920,76 +2131,112 @@ function hasShiftOrTransport(listSL, listTR) {
 
 
 
-function checkSchedule(listActivitySL) {
+function checkSchedule(listActivitySL, overlapFlag, scheduleDate) {
     // listActivitySL.sort(function (a, b) {
     //     return Date.parse('1970/01/01 ' + a.start.slice(0, -2) + ' ' + a.start.slice(-2)) - Date.parse('1970/01/01 ' + b.start.slice(0, -2) + ' ' + b.start.slice(-2))
     // });
 
-    return isBetweenCondTime(listActivitySL[0].start, listActivitySL[listActivitySL.length - 1].end)          //schedule start time
+    return isBetweenCondTime(listActivitySL[0].start, listActivitySL[listActivitySL.length - 1].end, overlapFlag, scheduleDate)          //schedule start time
 
 
 }
 
-function checkTimeRecord(listTimerecord) {
+function checkTimeRecord(listTimerecord, overlapFlag, scheduleDate) {
     // listTimerecord.sort(function (a, b) {
     //     return Date.parse('1970/01/01 ' + a.start.slice(0, -2) + ' ' + a.start.slice(-2)) - Date.parse('1970/01/01 ' + b.start.slice(0, -2) + ' ' + b.start.slice(-2))
     // });
-    return isBetweenCondTime(listTimerecord[0].start, listTimerecord[listTimerecord.length - 1].end)          //time record start or clock-in
+    return isBetweenCondTime(listTimerecord[0].start, listTimerecord[listTimerecord.length - 1].end, overlapFlag, scheduleDate)          //time record start or clock-in
 
 }
 
-function isBetweenCondTime(clockInTime, clockOutTime) { // clockin for check  between condition time
+function isBetweenCondTime(clockInTime, clockOutTime, overlapFlag, scheduleDate) { // clockin for check  between condition time
 
     let isPaid = {
         shift: false,
         transport: false
     }
-
-    let time = moment(clockInTime, format)
+    let time = moment(scheduleDate + clockInTime, 'YYYY-MM-DD ' + format)
+    let overlapDate = moment(scheduleDate, 'YYYY-MM-DD ' + format).add(1, 'day')
     // configuration 
-    let startShiftTime = moment(shiftStart, format),
-        endShiftTime = moment(shiftEnd, format)
+
+    let startShiftTime, endShiftTime;
+
+    if (overlapFlag) {
+        startShiftTime = moment(scheduleDate + shiftStart, 'YYYY-MM-DD ' + format)
+        endShiftTime = moment(overlapDate + shiftEnd, 'YYYY-MM-DD ' + format)
+    } else {
+        startShiftTime = moment(scheduleDate + shiftStart, 'YYYY-MM-DD ' + format)
+        endShiftTime = moment(scheduleDate + shiftEnd, 'YYYY-MM-DD ' + format)
+    }
 
     // check working 8 hour
-    if (time.isAfter(startShiftTime) || time.isBefore(endShiftTime)) {
+    // if (time.isAfter(startShiftTime) || time.isBefore(endShiftTime)) {
+    //     console.log('is between Shift')
+    //     if (checkStandardWorkTime(clockInTime, clockOutTime)) {
+    //         isPaid.shift = true
+    //     }
+    // }
+
+    if (time.isSame(startShiftTime) || time.isBetween(startShiftTime, endShiftTime) || time.isSame(endShiftTime)) { //ถ้ามี SL ช่วง Shift
         console.log('is between Shift')
-        if (checkStandardWorkTime(clockInTime, clockOutTime)) {
+
+        let clockIn, clockOut;
+        if (overlapFlag) {
+            clockIn = moment(scheduleDate + clockInTime, 'YYYY-MM-DD ' + format)
+            clockOut = moment(overlapDate + clockOutTime, 'YYYY-MM-DD ' + format)
+        } else {
+            clockIn = moment(scheduleDate + clockInTime, 'YYYY-MM-DD ' + format)
+            clockOut = moment(scheduleDate + clockOutTime, 'YYYY-MM-DD ' + format)
+        }
+        if (checkStandardWorkTime(clockIn, clockOut)) { // 
             isPaid.shift = true
         }
     }
 
-    let startTransportTime = moment(transportStart, format),
-        endTransportTime = moment(transportEnd, format)
+    let startTransportTime, endTransportTime;
 
-    //if (time.isAfter(startTransportTime) && time.isBefore(endTransportTime)) {
-    if (time.isBetween(startTransportTime, endTransportTime) || time.isSame(startTransportTime) || time.isBetween(endTransportTime)) {
-        console.log('is between Transport')
-        if (checkStandardWorkTime(clockInTime, clockOutTime)) {
-            isPaid.transport = true
-        }
-
+    if (overlapFlag) {
+        startTransportTime = moment(scheduleDate + transportStart, 'YYYY-MM-DD ' + format)
+        endTransportTime = moment(overlapDate + transportEnd, 'YYYY-MM-DD ' + format)
+    } else {
+        startTransportTime = moment(scheduleDate + transportStart, 'YYYY-MM-DD ' + format)
+        endTransportTime = moment(scheduleDate + transportEnd, 'YYYY-MM-DD ' + format)
     }
 
+    // if (time.isBetween(startTransportTime, endTransportTime) || time.isSame(startTransportTime) || time.isBetween(endTransportTime)) {
+    //     console.log('is between Transport')
+    //     if (checkStandardWorkTime(clockInTime, clockOutTime)) {
+    //         isPaid.transport = true
+    //     }
+    // }
+
+    if (time.isSame(startTransportTime) || time.isBetween(startTransportTime, endShiftTime) || time.isSame(endTransportTime)) { //ถ้ามี SL ช่วง Shift
+        console.log('is between Transport')
+
+        let clockIn, clockOut;
+        if (overlapFlag) {
+            clockIn = moment(scheduleDate + clockInTime, 'YYYY-MM-DD ' + format)
+            clockOut = moment(overlapDate + clockOutTime, 'YYYY-MM-DD ' + format)
+        } else {
+            clockIn = moment(scheduleDate + clockInTime, 'YYYY-MM-DD ' + format)
+            clockOut = moment(scheduleDate + clockOutTime, 'YYYY-MM-DD ' + format)
+        }
+        if (checkStandardWorkTime(clockIn, clockOut)) { // 
+            isPaid.transport = true
+        }
+    }
 
     return isPaid
-
 }
 
 //จะเหลือ case กรณี overlap กัน
 function checkStandardWorkTime(clockInTime, clockOutTime) {
-
+    console.log('checkStandardWorkTime:')
     console.log(clockInTime)
     console.log(clockOutTime)
-    //var clockInNextDay = moment('16:00:00', format)
-
-    let workTime = moment(clockInTime, format).add(standardWorkTime, 'hours');
+    let workTime = moment(clockInTime, format).add(standardWorkTime, 'hours'); // + 8 hour 
     let clockOut = moment(clockOutTime, format)
-
-    // if(moment(clockInTime, format).isSame(clockInNextDay)||moment(clockInTime, format).isAfter(clockInNextDay)){
-    //     // let xxx = moment('2018-03-04 22:00:00', "YYYY-MM-DD"+format).add(1, 'days');
-    //     let xxx = moment('2018-03-04 22:00:00',+format).add(1, 'days');
-    // }
-    if (workTime.isSame(clockOut) || workTime.isBefore(clockOut)) {
+    if (workTime.isSame(clockOut) || workTime.isAfter(clockOut)) {
         return true
     } else {
         return false
@@ -2016,6 +2263,20 @@ Number.prototype.pad = function (size) {
     return s;
 }
 
+
+function resetObjCond() {
+    return objbyCond = {
+        schedule: {},
+        actualClock: {},
+        flagPaid: {},
+        objHour: {},
+        objTime: {},
+        actualClockOT: {},
+        is2OT: false,
+        OT: { OT_1: '', OT1_5: '', OT_3: '' }
+    }
+}
+
 function isNotEmpty(str) {
     if (str == null || str == undefined || str == '') {
         return false
@@ -2038,281 +2299,158 @@ function isTrue(str) {
     return false
 }
 
+function changeFormatDate(date, format) {
+    console.log('changeFormatDate date:', date)
+    console.log('changeFormatDate format:', format)
+    return moment(date).format(format);
 
-// function getHour(start, end) {
-//     let result = 0;
-//     //let formatHour = 'HH:mm';
-//     let startTime = moment(start, formatHour);
-//     let endTime = moment(end, formatHour);
-//     let minutesDiff = Math.abs(parseInt(endTime.diff(startTime, 'minutes')));
-//     console.log('minutesDiff:', minutesDiff)
-//     if (minutesDiff >= 60) {
-//         let hour = Math.floor(minutesDiff / 60);
-//         let minutes = parseInt(minutesDiff) - (parseInt(60) * parseInt(hour))
-//         result = hour.pad() + ':' + minutes.pad();
-//     } else {
-//         result = minutesDiff
-//     }
+}
 
-//     console.log('result:' + result)
-
-// }
-
-Object.prototype.isEmptyObject = function () {
-    return Object.keys(Object(this)).length === 0 ? true : false
+function changeFormatBoolean(flag) {
+    if (flag) {
+        return 'Y'
+    } else {
+        return 'N'
+    }
 }
 
 
-//obj SL for one record
 
-let ObjSLtrain = [
-    { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '09:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '09:00', stopDt: '13:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Meal', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '13:00', stopDt: '14:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '14:00', stopDt: '18:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '18:00', stopDt: '19:00' },
-]
-let objSL = [
-    //{ tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '09:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '09:00', stopDt: '13:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Meal', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '13:00', stopDt: '14:00' },
-    // { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '07:00', stopDt: '07:20' },
-    // { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '08:20' },
-    //{ tvid: '1048', ssn: '31049', activity: 'Business Leave', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '14:00', stopDt: '15:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '15:00', stopDt: '18:00' },
-    //
-    { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '18:00', stopDt: '19:00' },
-    // { tvid: '1048', ssn: '31049', activity: 'Training', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '19:00', stopDt: '19:28' }
-]
-31377
-
-let testSL = [
-    //{ tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '09:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '20:00', stopDt: '00:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Meal', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '00:00', stopDt: '01:00' },
-    { tvid: '1048', ssn: '31049', activity: 'Answer Calls', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '01:00', stopDt: '04:00' },
-    // { tvid: '1048', ssn: '31049', activity: 'Overtime_AnswerCall', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', execDate: '2017-11-11', startDt: '08:00', stopDt: '08:20' },
-]
-
-let testTR = [
-    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '07:59', stopDt: '08:36' },
-    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:36', stopDt: '08:37' },
-    { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:37', stopDt: '09:01' },
-    { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:01', stopDt: '09:03' },
-    { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:03', stopDt: '09:05' },
-    { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:05', stopDt: '09:15' },
-    { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:15', stopDt: '09:16' },
-    { modify: '1510367334', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Rest Room', startDt: '09:16', stopDt: '09:28' },
-    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:28', stopDt: '09:38' },
-    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:38', stopDt: '09:39' },
-    { modify: '1510368277', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:39', stopDt: '09:42' },
-    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:42', stopDt: '09:45' },
-    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:45', stopDt: '09:49' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:49', stopDt: '09:52' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:52', stopDt: '09:54' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:54', stopDt: '09:55' },
-
-    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '19:38', stopDt: '19:39' },
-    { modify: '1510368277', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '19:39', stopDt: '19:42' },
-    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '19:42', stopDt: '20:45' },
-    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '20:45', stopDt: '00:49' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '00:49', stopDt: '03:52' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '03:52', stopDt: '04:54' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '04:54', stopDt: '07:55' }
-]
-
-let objTR = [
-    // { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Not Ready', startDt: '01:36', stopDt: '01:37' },
-    // { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '01:58', stopDt: '01:01' },
-    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '07:59', stopDt: '08:36' },
-    { modify: '1510364499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:36', stopDt: '08:37' },
-    { modify: '1510365756', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '08:37', stopDt: '09:01' },
-    { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:01', stopDt: '09:03' },
-    { modify: '1510366077', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:03', stopDt: '09:05' },
-    { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:05', stopDt: '09:15' },
-    { modify: '1510366705', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:15', stopDt: '09:16' },
-    { modify: '1510367334', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Rest Room', startDt: '09:16', stopDt: '09:28' },
-    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:28', stopDt: '09:38' },
-    { modify: '1510367963', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:38', stopDt: '09:39' },
-    { modify: '1510368277', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:39', stopDt: '09:42' },
-    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:42', stopDt: '09:45' },
-    { modify: '1510368591', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:45', stopDt: '09:49' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:49', stopDt: '09:52' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '09:52', stopDt: '09:54' },
-    { modify: '1510368907', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '09:54', stopDt: '09:55' },
-    { modify: '1510369550', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '09:55', stopDt: '10:02' },
-    { modify: '1510369550', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:02', stopDt: '10:03' },
-    { modify: '1510369550', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:03', stopDt: '10:05' },
-    { modify: '1510369869', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:05', stopDt: '10:06' },
-    { modify: '1510369869', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:06', stopDt: '10:11' },
-    { modify: '1510370192', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '10:11', stopDt: '10:12' },
-    { modify: '1510370192', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:12', stopDt: '10:13' },
-    { modify: '1510370192', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:13', stopDt: '10:14' },
-    { modify: '1510370510', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:14', stopDt: '10:17' },
-    { modify: '1510370510', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:17', stopDt: '10:19' },
-    { modify: '1510370827', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:19', stopDt: '10:24' },
-    { modify: '1510370827', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '10:24', stopDt: '10:26' },
-    { modify: '1510371145', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:26', stopDt: '10:28' },
-    { modify: '1510371145', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '10:28', stopDt: '10:30' },
-    { modify: '1510371145', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:30', stopDt: '10:31' },
-    { modify: '1510371465', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:31', stopDt: '10:35' },
-    { modify: '1510371465', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:35', stopDt: '10:36' },
-    { modify: '1510372097', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:36', stopDt: '10:44' },
-    { modify: '1510372097', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '10:44', stopDt: '10:46' },
-    { modify: '1510372097', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:46', stopDt: '10:48' },
-    { modify: '1510372416', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '10:48', stopDt: '10:49' },
-    { modify: '1510372416', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:49', stopDt: '10:52' },
-    { modify: '1510372416', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '10:52', stopDt: '10:53' },
-    { modify: '1510372736', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:53', stopDt: '10:57' },
-    { modify: '1510372736', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '10:57', stopDt: '10:58' },
-    { modify: '1510373700', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '10:58', stopDt: '11:12' },
-    { modify: '1510373700', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '11:12', stopDt: '11:14' },
-    { modify: '1510374017', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:14', stopDt: '11:15' },
-    { modify: '1510374017', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:15', stopDt: '11:17' },
-    { modify: '1510374017', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:17', stopDt: '11:19' },
-    { modify: '1510374335', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:19', stopDt: '11:22' },
-    { modify: '1510374335', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:22', stopDt: '11:24' },
-    { modify: '1510374653', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:24', stopDt: '11:29' },
-    { modify: '1510374653', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:29', stopDt: '11:30' },
-    { modify: '1510374971', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '11:30', stopDt: '11:31' },
-    { modify: '1510374971', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:31', stopDt: '11:34' },
-    { modify: '1510374971', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:34', stopDt: '11:35' },
-    { modify: '1510374971', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '11:35', stopDt: '11:36' },
-    { modify: '1510375607', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:36', stopDt: '11:42' },
-    { modify: '1510375607', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '11:42', stopDt: '11:43' },
-    { modify: '1510375607', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:43', stopDt: '11:46' },
-    { modify: '1510375924', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:46', stopDt: '11:49' },
-    { modify: '1510375924', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '11:49', stopDt: '11:52' },
-    { modify: '1510376242', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '11:52', stopDt: '11:54' },
-    { modify: '1510376561', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '11:54', stopDt: '12:00' },
-    { modify: '1510376561', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '12:00', stopDt: '12:02' },
-    { modify: '1510376881', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:02', stopDt: '12:06' },
-    { modify: '1510376881', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:06', stopDt: '12:07' },
-    { modify: '1510377199', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '12:07', stopDt: '12:08' },
-    { modify: '1510377199', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:08', stopDt: '12:13' },
-    { modify: '1510377516', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:13', stopDt: '12:15' },
-    { modify: '1510377832', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:15', stopDt: '12:22' },
-    { modify: '1510378149', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '12:22', stopDt: '12:25' },
-    { modify: '1510378149', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:25', stopDt: '12:29' },
-    { modify: '1510378466', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:29', stopDt: '12:30' },
-    { modify: '1510378782', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:30', stopDt: '12:35' },
-    { modify: '1510378782', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:35', stopDt: '12:37' },
-    { modify: '1510378782', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '12:37', stopDt: '12:38' },
-    { modify: '1510379099', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:38', stopDt: '12:40' },
-    { modify: '1510379099', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:40', stopDt: '12:42' },
-    { modify: '1510379418', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:42', stopDt: '12:45' },
-    { modify: '1510379418', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:45', stopDt: '12:47' },
-    { modify: '1510379418', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:47', stopDt: '12:49' },
-    { modify: '1510379418', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:49', stopDt: '12:50' },
-    { modify: '1510379736', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:50', stopDt: '12:52' },
-    { modify: '1510379736', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:52', stopDt: '12:54' },
-    { modify: '1510380056', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '12:54', stopDt: '12:56' },
-    { modify: '1510380056', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '12:56', stopDt: '12:58' },
-    { modify: '1510380380', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '12:58', stopDt: '13:02' },
-    { modify: '1510380380', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '13:02', stopDt: '13:03' },
-    { modify: '1510383922', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Not Ready', startDt: '14:00', stopDt: '14:02' },
-    { modify: '1510383922', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:02', stopDt: '14:04' },
-    { modify: '1510384238', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:04', stopDt: '14:06' },
-    { modify: '1510384238', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:06', stopDt: '14:07' },
-    { modify: '1510384238', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:07', stopDt: '14:09' },
-    { modify: '1510384238', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '14:09', stopDt: '14:10' },
-    { modify: '1510384561', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:10', stopDt: '14:12' },
-    { modify: '1510384561', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:12', stopDt: '14:13' },
-    { modify: '1510384561', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:13', stopDt: '14:15' },
-    { modify: '1510384885', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '14:15', stopDt: '14:17' },
-    { modify: '1510384885', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:17', stopDt: '14:20' },
-    { modify: '1510384885', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:20', stopDt: '14:21' },
-    { modify: '1510385207', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:21', stopDt: '14:26' },
-    { modify: '1510385531', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:26', stopDt: '14:27' },
-    { modify: '1510385531', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:27', stopDt: '14:29' },
-    { modify: '1510385531', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:29', stopDt: '14:30' },
-    { modify: '1510385856', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:30', stopDt: '14:34' },
-    { modify: '1510385856', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '14:34', stopDt: '14:35' },
-    { modify: '1510385856', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:35', stopDt: '14:36' },
-    { modify: '1510385856', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:36', stopDt: '14:37' },
-    { modify: '1510386179', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:37', stopDt: '14:40' },
-    { modify: '1510386179', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:40', stopDt: '14:42' },
-    { modify: '1510386501', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:42', stopDt: '14:43' },
-    { modify: '1510386501', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:43', stopDt: '14:46' },
-    { modify: '1510386834', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:46', stopDt: '14:51' },
-    { modify: '1510386834', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:51', stopDt: '14:52' },
-    { modify: '1510386834', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '14:52', stopDt: '14:53' },
-    { modify: '1510387160', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:53', stopDt: '14:56' },
-    { modify: '1510387160', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '14:56', stopDt: '14:58' },
-    { modify: '1510387160', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '14:58', stopDt: '14:59' },
-    { modify: '1510387485', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '14:59', stopDt: '15:04' },
-    { modify: '1510388123', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:04', stopDt: '15:10' },
-    { modify: '1510388123', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:10', stopDt: '15:11' },
-    { modify: '1510388123', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Outbound', startDt: '15:11', stopDt: '15:12' },
-    { modify: '1510388123', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '15:12', stopDt: '15:13' },
-    { modify: '1510388123', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:13', stopDt: '15:14' },
-    { modify: '1510388446', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:14', stopDt: '15:17' },
-    { modify: '1510388446', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '15:17', stopDt: '15:18' },
-    { modify: '1510388766', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:18', stopDt: '15:21' },
-    { modify: '1510388766', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:21', stopDt: '15:23' },
-    { modify: '1510389088', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:23', stopDt: '15:28' },
-    { modify: '1510389088', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:28', stopDt: '15:30' },
-    { modify: '1510389088', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '15:30', stopDt: '15:31' },
-    { modify: '1510389409', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:31', stopDt: '15:32' },
-    { modify: '1510389409', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '15:32', stopDt: '15:33' },
-    { modify: '1510389409', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:33', stopDt: '15:36' },
-    { modify: '1510389732', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:36', stopDt: '15:38' },
-    { modify: '1510390053', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:38', stopDt: '15:47' },
-    { modify: '1510390374', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '15:47', stopDt: '15:48' },
-    { modify: '1510390374', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:48', stopDt: '15:49' },
-    { modify: '1510390374', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '15:49', stopDt: '15:50' },
-    { modify: '1510390374', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '15:50', stopDt: '15:51' },
-    { modify: '1510390374', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '15:51', stopDt: '15:52' },
-    { modify: '1510390695', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '15:52', stopDt: '15:55' },
-    { modify: '1510391030', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Rest Room', startDt: '15:55', stopDt: '16:01' },
-    { modify: '1510391030', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:01', stopDt: '16:02' },
-    { modify: '1510391030', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '16:02', stopDt: '16:03' },
-    { modify: '1510391343', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:03', stopDt: '16:05' },
-    { modify: '1510391663', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:05', stopDt: '16:09' },
-    { modify: '1510391663', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:09', stopDt: '16:12' },
-    { modify: '1510391663', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '16:12', stopDt: '16:13' },
-    { modify: '1510391983', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:13', stopDt: '16:15' },
-    { modify: '1510391983', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '16:15', stopDt: '16:16' },
-    { modify: '1510391983', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Available', startDt: '16:16', stopDt: '16:17' },
-    { modify: '1510392620', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:17', stopDt: '16:26' },
-    { modify: '1510392620', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:26', stopDt: '16:27' },
-    { modify: '1510392939', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:27', stopDt: '16:32' },
-    { modify: '1510393258', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:32', stopDt: '16:36' },
-    { modify: '1510393576', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:36', stopDt: '16:42' },
-    { modify: '1510393576', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:42', stopDt: '16:44' },
-    { modify: '1510393897', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:44', stopDt: '16:47' },
-    { modify: '1510393897', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:47', stopDt: '16:49' },
-    { modify: '1510393897', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '16:49', stopDt: '16:50' },
-    { modify: '1510393897', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:50', stopDt: '16:51' },
-    { modify: '1510394217', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:51', stopDt: '16:53' },
-    { modify: '1510394537', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '16:53', stopDt: '16:58' },
-    { modify: '1510394537', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '16:58', stopDt: '16:59' },
-    { modify: '1510394537', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '16:59', stopDt: '17:01' },
-    { modify: '1510394858', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:01', stopDt: '17:03' },
-    { modify: '1510394858', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:03', stopDt: '17:05' },
-    { modify: '1510394858', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:05', stopDt: '17:07' },
-    { modify: '1510395180', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:07', stopDt: '17:09' },
-    { modify: '1510395180', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:09', stopDt: '17:10' },
-    { modify: '1510395180', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:10', stopDt: '17:11' },
-    { modify: '1510395499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:11', stopDt: '17:15' },
-    { modify: '1510395499', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:15', stopDt: '17:16' },
-    { modify: '1510396134', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:16', stopDt: '17:26' },
-    { modify: '1510396134', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:26', stopDt: '17:27' },
-    { modify: '1510396134', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:27', stopDt: '17:28' },
-    { modify: '1510397080', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:28', stopDt: '17:42' },
-    { modify: '1510397080', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:42', stopDt: '17:44' },
-    { modify: '1510397396', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:44', stopDt: '17:47' },
-    { modify: '1510397396', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:47', stopDt: '17:48' },
-    { modify: '1510397713', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:48', stopDt: '17:53' },
-
-
-    { modify: '1510397713', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:53', stopDt: '17:54' },
-    { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '17:54', stopDt: '17:57' },
-    { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:57', stopDt: '17:58' },
-    { modify: '1510398029', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'ACW', startDt: '17:58', stopDt: '17:59' },
-    { modify: '1510398345', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Follow Case', startDt: '17:59', stopDt: '18:02' },
-    //  { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '18:02', stopDt: '18:08' },
-    { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '18:02', stopDt: '18:50' },
-    { modify: '1510398661', ssn: '31049', organizeName: 'Serenade', agentName: 'Klangtong, Rungaroon S_PHP', scheduleDate: '2017-11-11', time_zone: 'Asia/Bangkok', activity: 'Answer Calls', startDt: '18:50', stopDt: '19:50' },
-]
+// let recordType = (type) => {
+//     if (type == 'ON')
+//         return {
+//             txDetailSLId: '',
+//             txDetailTRId: '',
+//             pin: '',
+//             scheduleStartDt: 'x',
+//             scheduleEndDt: 'x',
+//             otStartDt: '',
+//             otEndDt: '',
+//             actualClockinDt: '0.00',
+//             actualClockoutDt: '0.00',
+//             recordType: 'ON',
+//             shiftFlag: '',
+//             transportFlag: '',
+//             workHour: '',
+//             ot10: '0.00',
+//             ot15: '0.00',
+//             ot30: '0.00',
+//             recordDate: currentDate,
+//             recordMonth: '',
+//             useFlag: 'N',
+//             remark: '',
+//             lateTime: '',
+//             lostTime: '',
+//             createBy: 'Batch',
+//             createDt: '',
+//         }
+//     else if (type == 'OFF')
+//         return {
+//             txDetailSLId: '',
+//             txDetailTRId: '',
+//             pin: '',
+//             scheduleStartDt: '',
+//             scheduleEndDt: '',
+//             otStartDt: '',
+//             otEndDt: '',
+//             actualClockinDt: '',
+//             actualClockoutDt: '',
+//             recordType: 'OFF',
+//             shiftFlag: '',
+//             transportFlag: '',
+//             workHour: '',
+//             ot10: '0.00',
+//             ot15: '0.00',
+//             ot30: '0.00',
+//             recordDate: currentDate,
+//             recordMonth: '',
+//             useFlag: 'N',
+//             remark: '',
+//             lateTime: '',
+//             lostTime: '',
+//             createBy: 'Batch',
+//             createDt: '',
+//         }
+//     else if (type == 'LV')
+//         return {
+//             txDetailSLId: 'x',
+//             txDetailTRId: '',
+//             pin: 'x',
+//             scheduleStartDt: 'x',
+//             scheduleEndDt: 'x',
+//             otStartDt: '',
+//             otEndDt: '',
+//             actualClockinDt: '',
+//             actualClockoutDt: '',
+//             recordType: 'x',
+//             shiftFlag: false,
+//             transportFlag: false,
+//             ot10: '0.00',
+//             ot15: '0.00',
+//             ot30: '0.00',
+//             workHour: '',
+//             recordDate: currentDate,
+//             recordMonth: '',
+//             useFlag: 'N',
+//             remark: 'x',
+//             lateTime: '',
+//             lostTime: '',
+//             createBy: 'Batch',
+//             createDt: '',
+//         }
+//     else if (type == 'AutoOT')
+//         return {
+//             txDetailSLId: '',
+//             txDetailTRId: '',
+//             pin: '',
+//             scheduleStartDt: '',
+//             scheduleEndDt: '',
+//             otStartDt: '',
+//             otEndDt: '',
+//             actualClockinDt: '',
+//             actualClockoutDt: '',
+//             recordType: 'AutoOT',
+//             shiftFlag: '',
+//             transportFlag: '',
+//             ot10: '8.00',
+//             ot15: '0.00',
+//             ot30: '0.00',
+//             workHour: '',
+//             recordDate: currentDate,
+//             recordMonth: '',
+//             useFlag: 'N',
+//             remark: '',
+//             createBy: 'Batch',
+//             lateTime: '',
+//             lostTime: '',
+//             createDt: '',
+//         }
+//     else if (type == '2OT')
+//         return {
+//             txDetailSLId: '',
+//             txDetailTRId: '',
+//             pin: 'x',
+//             scheduleStartDt: '',
+//             scheduleEndDt: '',
+//             otStartDt: 'x',
+//             otEndDt: 'x',
+//             actualClockinDt: '',
+//             actualClockoutDt: '',
+//             recordType: 'x',
+//             shiftFlag: '',
+//             transportFlag: '',
+//             ot10: '0.00',
+//             ot15: '0.00',
+//             ot30: '0.00',
+//             workHour: '',
+//             recordDate: currentDate,
+//             recordMonth: '',
+//             useFlag: 'N',
+//             remark: '',
+//             createBy: 'Batch',
+//             lateTime: '',
+//             lostTime: '',
+//             createDt: '',
+//         }
+// }
 

@@ -1,0 +1,114 @@
+{
+    "local": {
+        "localPathSL": "D:/data/local/SL/",
+        "localPathTR": "D:/data/local/TR/",
+        "localPath": "D:/data/local/",
+        "nasPath": "D:/data/NAS/",
+        "archive": "D:/archire/",
+        "nasPathTR": "D:/data/NAS/TR/",
+        "config_database": {
+            "database": "alwsdb",
+            "user": "alwsdbuser",
+            "password": "ais@1234",
+            "host": "10.138.47.138",
+            "port": 5432,
+            "max": 5,
+            "min": 0,
+            "idleTimeoutMillis": 30000
+        },
+        "keyPath": {
+            "SL": "SL",
+            "TR": "TR",
+            "quota": "QUATA",
+            "activity": "ACT"
+        },
+        "prefix": {
+            "shopPIN": "/^(800|801)[0-9]{5}/",
+            "tmpPIN": "/^(80)5[0-9]{5}/"
+        }
+    },
+    "development": {
+        "localPathSL": "/app/alws/data/import/NICE-WFM/SL/",
+        "localPathTR": "/app/alws/data/import/NICE-WFM/TR/",
+        "localPath": "/app/alws/data/import/NICE-WFM/",
+        "nasPath": "/NAS_NICE-WFM/alws/data/",
+        "archive": "/app/alws/data/archive/NICE-WFM/",
+        "nasPathTR": "/NAS_NICE-WFM/alws/data/TR/",
+        "config_database": {
+            "database": "alwsdb",
+            "user": "alwsdbuser",
+            "password": "ais@1234",
+            "host": "10.138.47.138",
+            "port": 5432,
+            "max": 5,
+            "min": 0,
+            "idleTimeoutMillis": 30000
+        },
+        "keyPath": {
+            "SL": "SL",
+            "TR": "TR",
+            "quota": "QUATA",
+            "activity": "ACT"
+        },
+        "prefix": {
+            "shopPIN": "/^(800|801)[0-9]{5}/",
+            "tmpPIN": "/^(80)5[0-9]{5}/"
+        }
+    },
+    "staging": {
+        "localPathSL": "/app/alws/data/import/NICE-WFM/SL/",
+        "localPathTR": "/app/alws/data/import/NICE-WFM/TR/",
+        "localPath": "/app/alws/data/import/NICE-WFM/",
+        "nasPath": "/NAS_NICE-WFM/alws/data/",
+        "archive": "/app/alws/data/archive/NICE-WFM/",
+        "nasPathTR": "/NAS_NICE-WFM/alws/data/TR/",
+        "config_database": {
+            "database": "alwsdb",
+            "user": "alwsdbuser",
+            "password": "ais@1234",
+            "host": "10.138.47.138",
+            "port": 5432,
+            "max": 5,
+            "min": 0,
+            "idleTimeoutMillis": 30000
+        },
+        "keyPath": {
+            "SL": "SL",
+            "TR": "TR",
+            "quota": "QUATA",
+            "activity": "ACT"
+        },
+        "prefix": {
+            "shopPIN": "/^(800|801)[0-9]{5}/",
+            "tmpPIN": "/^(80)5[0-9]{5}/"
+        }
+    },
+    "production": {
+        "localPathSL": "/app/alws/data/import/NICE-WFM/SL/",
+        "localPathTR": "/app/alws/data/import/NICE-WFM/TR/",
+        "localPath": "/app/alws/data/import/NICE-WFM/",
+        "nasPath": "/NAS_NICE-WFM/alws/data/",
+        "archive": "/app/alws/data/archive/NICE-WFM/",
+        "nasPathTR": "/NAS_NICE-WFM/alws/data/TR/",
+        "config_database": {
+            "database": "alwsdb",
+            "user": "alwsdbuser",
+            "password": "ais@1234",
+            "host": "10.138.47.138",
+            "port": 5432,
+            "max": 5,
+            "min": 0,
+            "idleTimeoutMillis": 30000
+        },
+        "keyPath": {
+            "SL": "SL",
+            "TR": "TR",
+            "quota": "QUATA",
+            "activity": "ACT"
+        },
+        "prefix": {
+            "shopPIN": "/^(800|801)[0-9]{5}/",
+            "tmpPIN": "/^(80)5[0-9]{5}/"
+        }
+    }
+}

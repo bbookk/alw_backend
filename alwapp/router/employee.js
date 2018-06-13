@@ -6,13 +6,19 @@ const employeeController = require('../controllers').employeeController;
 module.exports = [
     { 
         method: 'GET', path: '/employee/{pin}', handler: function (request, reply) {
-            employeeController.getEmployeeInfoByPin(request, reply);
+            return employeeController.getEmployeeInfoByPin(request, reply);
         } 
     },
     { 
         method: 'GET', path: '/employee', handler: function (request, reply) 
         {  
-            reply.response('Not support this api').code(400);
+            return employeeController.getEmployeeInfoByToken(request, reply);
+        } 
+    },
+    { 
+        method: 'GET', path: '/employee-agent', handler: function (request, reply) 
+        {  
+            return employeeController.getAllEmployeeAndAgentInfo(request, reply);
         } 
     }
 ];

@@ -18,16 +18,21 @@ module.exports.log_access = (req, res, time) => {
         '-', // reserve for content length
         res.statusCode,
         ]. join ( '|' ));
-}  
+}
+
+module.exports.addContext = (key, value) => {
+    appLog.addContext(key, value);
+}
+
+module.exports.clearContext = () => {
+    appLog.clearContext();
+}
 
 module.exports.isInfoEnabled = () => {
     return appLog.isInfoEnabled();
 }
 
 module.exports.info = (msg) => {
-    var scriptName = __filename.slice(__dirname.length + 1);
-    appLog.addContext('script', scriptName);
-
     appLog.info(msg);
 } 
 
@@ -36,9 +41,6 @@ module.exports.isDebugEnabled = () => {
 }
 
 module.exports.debug = (msg) => {
-    var scriptName = __filename.slice(__dirname.length + 1);
-    appLog.addContext('script', scriptName);
-
     appLog.debug(msg);
 }
 
@@ -47,9 +49,6 @@ module.exports.isFatalEnabled = () => {
 }
 
 module.exports.fatal = (msg, err) => {
-    var scriptName = __filename.slice(__dirname.length + 1);
-    appLog.addContext('script', scriptName);
-
     if (err != null) {
         appLog.fatal(msg, err);
     } else {
@@ -62,9 +61,6 @@ module.exports.isErrorEnabled = () => {
 }
 
 module.exports.error = (msg, err) => {
-    var scriptName = __filename.slice(__dirname.length + 1);
-    appLog.addContext('script', scriptName);
-
     if (err != null) {
         appLog.error(msg, err);
     } else {
@@ -77,9 +73,6 @@ module.exports.isTraceEnabled = () => {
 }
 
 module.exports.trace = (msg) => {
-    var scriptName = __filename.slice(__dirname.length + 1);
-    appLog.addContext('script', scriptName);
-
     appLog.trace(msg);
 }
 
@@ -89,8 +82,9 @@ module.exports.log_service = (service) => {
         service.name,
         service.req,
         service.res || '-',
+        service.message,
         service.statusCode,
-        time || '-',
+        service.time || '-',
     ]. join ( '|' ));
 
 }

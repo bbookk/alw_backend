@@ -1,5 +1,4 @@
 'use strict';
-
 var crypto = require('crypto');
 var pool = 31 * 128; // 36 chars minus 4 dashes and 1 four
 var r = crypto.randomBytes(pool);
@@ -44,4 +43,18 @@ function uuid(){
   return strs.join('');
 }
 
-module.exports = { uuid };
+function encodeBase64(algorithm, key, text) {
+  var cipher = crypto.createCipher(algorithm,key)
+  var crypted = cipher.update(text,'utf8','base64')
+  crypted += cipher.final('base64');
+  return crypted;
+}
+
+function decodeBase64(algorithm, key, text) {
+  var decipher = crypto.createDecipher(algorithm,key)
+  var dec = decipher.update(text,'base64','utf8')
+  dec += decipher.final('utf8');
+  return dec;
+}
+
+module.exports = { uuid, encodeBase64, decodeBase64 };

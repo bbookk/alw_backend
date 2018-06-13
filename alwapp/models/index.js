@@ -7,6 +7,19 @@ var basename  = path.basename(__filename);
 var env       = process.env.NODE_ENV || 'development';
 var config    = require(__dirname + '/../config/config.json')[env];
 var db        = {};
+
+/**
+ * Logging service
+ */
+const logService = require('../service/log-service');
+
+// to override logging config
+config.logging = function(str) {
+  if (logService.isDebugEnabled()) {
+    logService.debug("[SQL] " + str);
+  }
+}
+
 if (config.use_env_variable) {
   var sequelize = new Sequelize(process.env[config.use_env_variable], config);
 } else {
