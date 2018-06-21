@@ -45,8 +45,8 @@ module.exports = {
             return reply.response(apiResponse)
                 .code(200)
                 // attach token to cookie
-                .header('Set-Cookie', 'token' + '=' + token)
-                .header('cookie', 'token' + '=' + token);
+                .header('Set-Cookie', 'token=' + token)
+                .header('cookie', 'token=' + token);
         } else {
             var apiResponse = new ApiResponse();
             apiResponse.status = Constant.API.STATUS_ERROR;
@@ -85,7 +85,8 @@ module.exports = {
             apiResponse.response = {};
             apiResponse.responseTime = new Date();
 
-            return reply.response(apiResponse).code(200);
+            return reply.response(apiResponse).code(200)
+            .header('Set-Cookie', 'token=; expires='+new Date(new Date().getTime()+86409000).toUTCString());
         } else {
             var apiResponse = new ApiResponse();
             apiResponse.status = Constant.API.STATUS_ERROR;

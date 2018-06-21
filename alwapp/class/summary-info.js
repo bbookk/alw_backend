@@ -352,10 +352,10 @@ function defaultValue(type, ref) {
 
     ref.managerPin = '';
     ref.superPin = '';
-    ref.cmpy = '';
-    ref.bu = '';
-    ref.section = '';
-    ref.dp = '';
-    ref.fn = '';
+    ref.cmpy = 'NOT_FOUND';
+    ref.bu = 'NOT_FOUND';
+    ref.section = 'NOT_FOUND';
+    ref.dp = 'NOT_FOUND';
+    ref.fn = 'NOT_FOUND';
 }
 

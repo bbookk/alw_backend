@@ -1,7 +1,7 @@
 /* eslint new-cap: "off", global-require: "off" */
-const moment = require('moment');
+
 module.exports = (sequelize, DataTypes) => {
-    const TxSummaryDetail = sequelize.define('TxSummaryDetail', {
+    const TxSummaryDetail112017 = sequelize.define('TxSummaryDetail112017', {
         summaryDetailId: {
             type: DataTypes.INTEGER,
             field: 'summary_detail_id',
@@ -27,50 +27,32 @@ module.exports = (sequelize, DataTypes) => {
         scheduleStartDt: {
             type: DataTypes.DATE,
             field: 'schedule_start_dt',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('scheduleStartDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: true
         },
         scheduleEndDt: {
             type: DataTypes.DATE,
             field: 'schedule_end_dt',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('scheduleEndDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: true
         },
         otStartDt: {
             type: DataTypes.DATE,
             field: 'ot_start_dt',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('otStartDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: true
         },
         otEndDt: {
             type: DataTypes.DATE,
             field: 'ot_end_dt',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('otEndDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: true
         },
         actualClockinDt: {
             type: DataTypes.DATE,
             field: 'actual_clockin_dt',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('actualClockinDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: true
         },
         actualClockoutDt: {
             type: DataTypes.DATE,
             field: 'actual_clockout_dt',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('actualClockoutDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: true
         },
         recordType: {
             type: DataTypes.STRING(50),
@@ -115,10 +97,7 @@ module.exports = (sequelize, DataTypes) => {
         recordDate: {
             type: DataTypes.DATEONLY,
             field: 'record_date',
-            allowNull: true,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('recordDate')).add(7, 'hours').format('YYYY-MM-DD');
-            // }
+            allowNull: true
         },
         recordMonth: {
             type: DataTypes.CHAR(6),
@@ -143,10 +122,7 @@ module.exports = (sequelize, DataTypes) => {
         createDt: {
             type: DataTypes.DATE,
             field: 'create_dt',
-            allowNull: false,
-            // get: function () {
-            //     return moment.utc(this.getDataValue('createDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
-            // }
+            allowNull: false
         },
         managerPin: {
             type: DataTypes.STRING(8),
@@ -185,12 +161,11 @@ module.exports = (sequelize, DataTypes) => {
         },
     }, {
             schema: 'public',
-            tableName: 'tx_summary_detail',
+            tableName: 'tx_summary_detail_112017',
             timestamps: false
         });
 
-
-    return TxSummaryDetail;
+    return TxSummaryDetail112017;
 };
 
 module.exports.initRelations = () => {

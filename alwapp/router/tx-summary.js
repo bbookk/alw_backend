@@ -32,5 +32,10 @@ module.exports = [
         method: 'POST', path: '/report/getSummaryDaily', config: { auth: false }, handler: (request, reply) => {
             return txSummaryDetailController.getSummaryDaily(request, reply);
         }
+    },
+    { 
+        method: 'POST', path: '/report/getDetail', config: { auth: false }, handler: (request, reply) => {
+            return txSummaryDetailController.getDailyDetail(request, reply);
+        }
     }
 ];

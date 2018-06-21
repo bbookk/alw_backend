@@ -252,11 +252,97 @@ module.exports = class EmployeeInfo {
     // organizeInfoList
     set organizeInfoList(organizeInfoList) {
         this._organizeInfoList = organizeInfoList;
+
+        this.clearAllOrganize();
+        parseOrganizeInfoList(this);
     }
     get organizeInfoList() {
         return this._organizeInfoList;
     }
     
+    // CO
+    set orgCodeCO(orgCodeCO) {
+        this._orgCodeCO = orgCodeCO;
+    }
+    set orgNameCO(orgNameCO) {
+        this._orgNameCO = orgNameCO;
+    }
+    get orgCodeCO() {
+        return this._orgCodeCO;
+    }
+    get orgNameCO() {
+        return this._orgNameCO;
+    }
+
+    // BL
+    set orgCodeBL(orgCodeBL) {
+        this._orgCodeBL = orgCodeBL;
+    }
+    set orgNameBL(orgNameBL) {
+        this._orgNameBL = orgNameBL;
+    }
+    get orgCodeBL() {
+        return this._orgCodeBL;
+    }
+    get orgNameBL() {
+        return this._orgNameBL;
+    }
+    
+    // BU
+    set orgCodeBU(orgCodeBU) {
+        this._orgCodeBU = orgCodeBU;
+    }
+    set orgNameBU(orgNameBU) {
+        this._orgNameBU = orgNameBU;
+    }
+    get orgCodeBU() {
+        return this._orgCodeBU;
+    }
+    get orgNameBU() {
+        return this._orgNameBU;
+    }
+
+    // DP
+    set orgCodeDP(orgCodeDP) {
+        this._orgCodeDP = orgCodeDP;
+    }
+    set orgNameDP(orgNameDP) {
+        this._orgNameDP = orgNameDP;
+    }
+    get orgCodeDP() {
+        return this._orgCodeDP;
+    }
+    get orgNameDP() {
+        return this._orgNameDP;
+    }
+
+    // SC
+    set orgCodeSC(orgCodeSC) {
+        this._orgCodeSC = orgCodeSC;
+    }
+    set orgNameSC(orgNameSC) {
+        this._orgNameSC = orgNameSC;
+    }
+    get orgCodeSC() {
+        return this._orgCodeSC;
+    }
+    get orgNameSC() {
+        return this._orgNameSC;
+    }
+
+    //FC
+    set orgCodeFC(orgCodeFC) {
+        this._orgCodeFC = orgCodeFC;
+    }
+    set orgNameFC(orgNameFC) {
+        this._orgNameFC = orgNameFC;
+    }
+    get orgCodeFC() {
+        return this._orgCodeFC;
+    }
+    get orgNameFC() {
+        return this._orgNameFC;
+    }
     
     toJSON() {
         return {
@@ -288,5 +374,47 @@ module.exports = class EmployeeInfo {
             "employee_group": this._employeeGroup,
             "authorize_info": this._authorizeInfo
         };
+    }
+
+    clearAllOrganize() {
+        this._orgCodeCO = NaN;
+        this._orgNameCO = NaN;
+        this._orgCodeBL = NaN;
+        this._orgNameBL = NaN;
+        this._orgCodeBU = NaN;
+        this._orgNameBU = NaN;
+        this._orgCodeDP = NaN;
+        this._orgNameDP = NaN;
+        this._orgCodeSC = NaN;
+        this._orgNameSC = NaN;
+        this._orgCodeFC = NaN;
+        this._orgNameFC = NaN;
+    }
+}
+
+function parseOrganizeInfoList(employeeInfo) {
+    
+    if (employeeInfo.organizeInfoList && employeeInfo.organizeInfoList.length > 0) {
+      employeeInfo.organizeInfoList.forEach(function (organizeInfo) {
+        if (organizeInfo.orgLevel == 'BU') {
+            employeeInfo.orgCodeBU = organizeInfo.orgCode;
+            employeeInfo.orgNameBU = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
+        } else if (organizeInfo.orgLevel == 'BL') {
+            employeeInfo.orgCodeBL = organizeInfo.orgCode;
+            employeeInfo.orgNameBL = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
+        } else if (organizeInfo.orgLevel == 'DP') {
+            employeeInfo.orgCodeDP = organizeInfo.orgCode;
+            employeeInfo.orgNameDP = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
+        } else if (organizeInfo.orgLevel == 'CO') {
+            employeeInfo.orgCodeCO = organizeInfo.orgCode;
+            employeeInfo.orgNameCO = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";  
+        } else if (organizeInfo.orgLevel == 'FC') {
+            employeeInfo.orgCodeFC = organizeInfo.orgCode;
+            employeeInfo.orgNameFC = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";  
+        } else if (organizeInfo.orgLevel == 'SC') {
+            employeeInfo.orgCodeSC = organizeInfo.orgCode;
+            employeeInfo.orgNameSC = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";  
+        }
+      });
     }
 }

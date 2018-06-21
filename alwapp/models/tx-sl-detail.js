@@ -40,7 +40,7 @@ module.exports = (sequelize, DataTypes) => {
             field: 'schedule_date',
             allowNull: true,
             get: function () {
-                return moment.utc(this.getDataValue('scheduleDate')).add(7, 'hours').format('YYYY-MM-DD');
+                return moment.utc(this.getDataValue('scheduleDate')).add(7, 'hours').format('MM/DD/YYYY');
             }
         },
         time_zone: {
@@ -69,16 +69,21 @@ module.exports = (sequelize, DataTypes) => {
             field: 'exec_date',
             allowNull: true,
             get: function () {
-                return moment.utc(this.getDataValue('execDate')).add(7, 'hours').format('YYYY-MM-DD');
+                return moment.utc(this.getDataValue('execDate')).add(7, 'hours').format('MM/DD/YYYY');
             }
 
+        },
+        isPaid :{
+            type: DataTypes.CHAR(1),
+            field: 'is_paid',
+            allowNull: false
         },
         createDt: {
             type: DataTypes.DATE,
             field: 'create_dt',
             allowNull: true,
             get: function () {
-                return moment.utc(this.getDataValue('createDt')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+                return moment.utc(this.getDataValue('createDt')).add(7, 'hours').format('MM/DD/YYYY HH:mm:ss');
             }
         },
         createBy: {

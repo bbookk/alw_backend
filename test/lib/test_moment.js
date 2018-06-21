@@ -1,4 +1,4 @@
-
+var assert = require('assert');
 var moment = require('moment');
 
 process.env['NODE_TLS_REJECT_UNAUTHORIZED'] = '0';
@@ -10,33 +10,45 @@ var log4js = require('log4js');
 log4js.configure('./alwapp/config/test-log4js.json');
 
 describe('moment', function() {
-    describe('#moment(\'01/01/2018\', \'DD/MM/YYYY\').utc(7).toDate()', function() {
+    describe('#moment.utc(\'01/01/2018\', \'DD/MM/YYYY\').toDate()', function() {
         it('should return 1 Jan 2018', async function() {
-            console.log(moment('01/01/2018', 'DD/MM/YYYY').utc(7).toDate());
+            console.log(moment.utc('01/01/2018', 'DD/MM/YYYY').toDate());
         });
     });
 
-    describe('#moment(new Date()).utc(7).toDate()', function() {
+    describe('#moment.utc(new Date()).toDate()', function() {
         it('should return current date', async function() {
-            console.log(moment(new Date()).utc(7).toDate());
+            console.log(moment.utc(new Date()).toDate());
         });
     });
 
-    describe('#moment(new Date()).subtract(1,\'day\').utc(7).toDate()', function() {
+    describe('#moment.utc(new Date()).subtract(1,\'day\').toDate()', function() {
         it('should return current date', async function() {
-            console.log(moment(new Date()).subtract(1,'day').utc(7).toDate());
+            console.log(moment.utc(new Date()).subtract(1,'day').toDate());
         });
     });
 
-    describe('#moment(new Date()).utc(7).format(\'MMYYYY\')', function() {
-        it('should return current date string in format MMYYYY', async function() {
-            console.log(moment(new Date()).utc(7).format('MMYYYY'));
+    describe('#moment.utc(new Date()).format(\'MMYYYY\')', function() {
+        it('should return string 012018', async function() {
+            assert.equal(moment.utc('01/01/2018', 'DD/MM/YYYY').format('MMYYYY'), '012018');
         });
     });
 
-    describe('#moment(new Date()).utc(7).set({hour:0,minute:0,second:0,millisecond:0})', function() {
+    describe('#moment.utc(new Date()).set({hour:0,minute:0,second:0,millisecond:0})', function() {
         it('should return current date 00:00:00.000', async function() {
-            console.log(moment(new Date()).utc(7).set({hour:0,minute:0,second:0,millisecond:0}));
+            console.log(moment.utc(new Date()).set({hour:0,minute:0,second:0,millisecond:0}));
+        });
+    });
+
+    describe('#moment.utc(new Date()).startOf(\'day\'))', function() {
+        it('should return current date 00:00:00.000', async function() {
+            console.log(moment.utc(new Date()).startOf('day'));
+        });
+    });
+
+    describe('#moment.utc(new Date()).endOf(\'day\'))', function() {
+        it('should return current date 23:59:59.999', async function() {
+            console.log(moment.utc(new Date()).endOf('day'));
         });
     });
 

@@ -10,6 +10,7 @@ const batchImport = {
     batchService.copyFromNas();
     batchService.importSL();
     batchService.importTR();
+    // batchService.testCBP();
   }
 };
 

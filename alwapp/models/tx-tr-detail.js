@@ -41,11 +41,19 @@ module.exports = (sequelize, DataTypes) => {
             allowNull: false
         },
         scheduleDate: {
-            type: DataTypes.DATE,
+            type: DataTypes.DATEONLY,
             field: 'schedule_date',
             allowNull: true,
             get: function () {
-                return moment.utc(this.getDataValue('scheduleDate')).add(7, 'hours').format('YYYY-MM-DD HH:mm:ss');
+                return moment.utc(this.getDataValue('scheduleDate')).add(7, 'hours').format('YYYY-MM-DD');
+            }
+        },
+        execDt: {
+            type: DataTypes.DATEONLY,
+            field: 'exec_dt',
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('execDt')).add(7, 'hours').format('YYYY-MM-DD');
             }
         },
         time_zone: {
@@ -75,6 +83,54 @@ module.exports = (sequelize, DataTypes) => {
             get: function () {
                 return moment.utc(this.getDataValue('stopDt')).add(7, 'hours').format('HH:mm');
             }
+        },
+        isApprove: {
+            type: DataTypes.CHAR(1),
+            field: 'is_approve',
+            allowNull: false,
+        },
+        isPaid: {
+            type: DataTypes.CHAR(1),
+            field: 'is_paid',
+            allowNull: false,
+        },
+        duration : {
+            type: DataTypes.STRING(5),
+            field: 'duration',
+            allowNull: false,
+        },
+        timeSourceCode : {
+            type: DataTypes.STRING(5),
+            field: 'time_source_code',
+            allowNull: false,
+        },
+        eventType : {
+            type: DataTypes.STRING(5),
+            field: 'event_type',
+            allowNull: false,
+        },
+        lastUpdateDt :{
+            type: DataTypes.DATEONLY,
+            field: 'last_update_dt',
+            timezone: '+07:00',
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('lastUpdateDt')).add(7, 'hours').format('HH:mm');
+            }
+        },
+        lastUpdateTime :{
+            type: DataTypes.DATE,
+            field: 'last_update_time',
+            timezone: '+07:00',
+            allowNull: true,
+            get: function () {
+                return moment.utc(this.getDataValue('lastUpdateTime')).add(7, 'hours').format('HH:mm');
+            }
+        },
+        lastUpdateBy :{
+            type: DataTypes.STRING(20),
+            field: 'last_update_by',
+            allowNull: true,
         },
         createDt: {
             type: DataTypes.DATE,

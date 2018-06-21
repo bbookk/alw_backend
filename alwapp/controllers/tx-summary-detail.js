@@ -7,13 +7,9 @@
 const summaryDetailModel = require('../models').TxSummaryDetail;
 const ApiResponse = require('../class/api-response');
 const Constant = require('../class/constant').Constant;
-const moment = require('moment');
 
-const employeeService = require('../service/employee-service');
-const omService = require('../service/om-service');
-const EmployeeInfo = require('../class/employee-info');
 const ServiceError = require('../class/service-error');
-const Op = require('../models').Sequelize.Op;
+const txSummaryService = require('../service/tx-summary-service');
 
 /**
  * Logging service
@@ -78,6 +74,31 @@ module.exports = {
     return res.json({
       todo: 'remove() is not implemented yet!'
     });
+  },getDailyDetail: async function (request, reply) {
+
+    try {
+      logService.info("Start: tx-summary-detail.getDailyDetail()");
+
+      let reportResp = await txSummaryService.getDetail(request.payload.show_detail_daily);
+
+      let apiResponse = new ApiResponse();
+      apiResponse.status = Constant.API.STATUS_SUCCESS;
+      apiResponse.name = 'getDailyDetailResp';
+      apiResponse.response = reportResp;
+      apiResponse.responseTime = new Date();
+
+      return reply.response(apiResponse).code(200);
+    } catch (err) {
+      logService.error("Error while getDailyDetail", err);
+      let apiResponse = new ApiResponse();
+      apiResponse.status = Constant.API.STATUS_ERROR;
+      apiResponse.message = err.message;
+      apiResponse.responseTime = new Date();
+
+      return reply.response(apiResponse).code(400);
+    } finally {
+      logService.info("End: tx-summary-detail.getDailyDetail()");
+    }
   },
 
   getSummaryDaily: async function (request, reply) {
@@ -86,106 +107,27 @@ module.exports = {
     //     surname:"asdasd"
     // {"search_daily":{"pin":"123123","dateFrom":"03/05/2018","dateTo":"18/05/2018"},"header":{"ref_id":"ref_id","language":"EN"}}
     try {
-      let whereFindAll = {}
-      let payload = request.payload.search_daily
-      // check whether pin or name and surname has provided
-      if (isNotEmpty(payload.pin)) {
-        whereFindAll['pin'] = payload.pin
-      } else if (payload.name && payload.surname) {
-        // get pin from provided name or surname
-        var employeeInfo = new EmployeeInfo();
-        employeeInfo.nameEn = payload.name || '';
-        employeeInfo.surnameEn = payload.surname || '';
-        
-        await omService.searchEmployeeDetail(employeeInfo)
-        .then(employeeInfoResp => {
-          if (logService.isDebugEnabled()) {
-            logService.debug("employeeInfoResp.length = " + employeeInfoResp.length);
-          }
-          whereFindAll['pin'] = employeeInfoResp[0].pin;
-        });
-      } else {
-        throw new ServiceError("Missing required parameters", Constant.API.STATUS_CODE_INVALID_PARAM);
-      }
-      
-      var dateFrom,dateTo;
-      
-      if (isNotEmpty(payload.dateFrom)) {
-        dateFrom = moment(payload.dateFrom, 'DD/MM/YYYY').utc(7).toDate();
-      } else {
-        if (isNotEmpty(payload.dateTo)) {
-          // set default dateFrom to dateTo - 1
-          dateFrom = moment(payload.dateTo, 'DD/MM/YYYY').subtract(1,'day').utc(7).toDate();
-        } else {
-          // set default dateFrom to yesterday if dateTo not present
-          dateFrom = moment(new Date()).subtract(1,'day').utc(7).toDate();
-        }
-      }
-      if (isNotEmpty(payload.dateTo)) {
-        dateTo = moment(payload.dateTo, 'DD/MM/YYYY').utc(7).toDate();
-      } else {
-        // set default dateTo to dateFrom + 1
-        dateTo = moment(dateFrom).add(1, 'day').toDate();
-      }
-      
-      if (logService.isDebugEnabled()) {
-        logService.debug("dateFrom = " + dateFrom);
-        logService.debug("dateTo = " + dateTo);
-      }
+      logService.info("Start: tx-summary-detail.getSummaryDaily()");
 
-      // create where clause of record_date
-      whereFindAll['record_date'] = {
-        [Op.between] : [dateFrom,dateTo]
-      }
-
-      // set value for partition column
-      // create month and year array
-      var monthYearList = [];
-      var nextMonth = moment(dateFrom).utc(7).set({hour:0,minute:0,second:0,millisecond:0});
-      while (true)
-      {
-        if (nextMonth.toDate() <= dateTo) {
-          monthYearList.push(nextMonth.format('MMYYYY'));
-          nextMonth.add(1,'month');
-          continue;
-        } else {
-          break;
-        }
-      }
-
-      // to use partition table
-      whereFindAll['record_month'] = {
-        [Op.in] : monthYearList
-      }
-
-      var employeeInfo = await employeeService.getEmployeeDetailWithOrganizeByPin(whereFindAll['pin']);
-
-      if (logService.isTraceEnabled()) {
-        logService.trace(JSON.stringify(employeeInfo));
-      }
-
-      let obj = await summaryDetailModel.findAll({
-        where: whereFindAll,
-      }).then((todos) => {
-        return nodeData = todos.map((node) => node.get({ plain: true }));
-      }).catch((error) => { console.log(error) });
-      let employeeInfoResp = objToJsonDaily(employeeInfo, obj, reply)
+      let reportResp = await txSummaryService.getSummaryDaily(request.payload.search_daily);
 
       let apiResponse = new ApiResponse();
       apiResponse.status = Constant.API.STATUS_SUCCESS;
       apiResponse.name = 'searchDailyResp';
-      apiResponse.response = employeeInfoResp;
+      apiResponse.response = reportResp;
       apiResponse.responseTime = new Date();
 
       return reply.response(apiResponse).code(200);
     } catch (err) {
-      console.log(err);
+      logService.error("Error while get summary daily", err);
       let apiResponse = new ApiResponse();
       apiResponse.status = Constant.API.STATUS_ERROR;
       apiResponse.message = err.message;
       apiResponse.responseTime = new Date();
 
       return reply.response(apiResponse).code(400);
+    } finally {
+      logService.info("End: tx-summary-detail.getSummaryDaily()");
     }
     // return reply.response({
 
@@ -521,161 +463,192 @@ module.exports = {
 
     })
   },
-  getSummaryOrganization: function (request, reply) {
-    return reply.response({
-      "header": {
-        "status": "S",
-        "resp_dttm": "2016-08-12T00:00:00+00:00"
-      },
-      "searchOrganizationResp": {
-        "employeeDetail": {
-          "pin": "1111",
-          "name": "book jt",
-          "bl": "test",
-          "company": "Advanced Contact Center",
-          "bu": "Contact Center BKK",
-          "department": "Center"
-        },
-        "resultRecord": [
-          {
-            "id": "1",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          },
-          {
-            "id": "2",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          },
-          {
-            "id": "1",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          },
-          {
-            "id": "2",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          }, {
-            "id": "1",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          },
-          {
-            "id": "2",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          }, {
-            "id": "1",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          },
-          {
-            "id": "2",
-            "name": "Call center",
-            "orgShortName": "bu-CC1",
-            "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
-            "shift": "500.00",
-            "trans": "1000.00",
-            "attendance": "200.00",
-            "absent": "0",
-            "late": "0.00",
-            "leave": {
-              "sick": "0.00",
-              "business": "0.00",
-              "holiday": "0.00",
-              "others": "0.00"
-            }
-          }
+  getSummaryOrganization: async function (request, reply) {
+
+    // name:"sadfasd"
+    // surname:"asdasd"
+    // {"search_organization":{"company":"50030642","businessUnit":"50054194","department":"","dateFrom":"01/11/2017","dateTo":"30/11/2017"},"header":{"ref_id":"ref_id","language":"EN"}}
+    try {
+      logService.info("Start: tx-summary-detail.getSummaryOrganization()");
+
+      let reportResp = await txSummaryService.getSummaryOrganization(request.payload.search_organization);
+
+      let apiResponse = new ApiResponse();
+      apiResponse.status = Constant.API.STATUS_SUCCESS;
+      apiResponse.name = 'searchOrganizationResp';
+      apiResponse.response = {
+        result_record : reportResp
+      };
+      apiResponse.responseTime = new Date();
+
+      return reply.response(apiResponse).code(200);
+    } catch (err) {
+      logService.error('Error while query report', err);
+
+      let apiResponse = new ApiResponse();
+      apiResponse.status = Constant.API.STATUS_ERROR;
+      apiResponse.message = err.message;
+      apiResponse.responseTime = new Date();
+
+      return reply.response(apiResponse).code(400);
+    } finally {
+      logService.info("End: tx-summary-detail.getSummaryOrganization()");
+    }
+
+    // return reply.response({
+    //   "header": {
+    //     "status": "S",
+    //     "resp_dttm": "2016-08-12T00:00:00+00:00"
+    //   },
+    //   "searchOrganizationResp": {
+    //     "employeeDetail": {
+    //       "pin": "1111",
+    //       "name": "book jt",
+    //       "bl": "test",
+    //       "company": "Advanced Contact Center",
+    //       "bu": "Contact Center BKK",
+    //       "department": "Center"
+    //     },
+    //     "resultRecord": [
+    //       {
+    //         "id": "1",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       },
+    //       {
+    //         "id": "2",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       },
+    //       {
+    //         "id": "1",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       },
+    //       {
+    //         "id": "2",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       }, {
+    //         "id": "1",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       },
+    //       {
+    //         "id": "2",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       }, {
+    //         "id": "1",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       },
+    //       {
+    //         "id": "2",
+    //         "name": "Call center",
+    //         "orgShortName": "bu-CC1",
+    //         "otHours": { "ot1": "0.00", "ot15": "0.00", "ot3": "2.00" },
+    //         "shift": "500.00",
+    //         "trans": "1000.00",
+    //         "attendance": "200.00",
+    //         "absent": "0",
+    //         "late": "0.00",
+    //         "leave": {
+    //           "sick": "0.00",
+    //           "business": "0.00",
+    //           "holiday": "0.00",
+    //           "others": "0.00"
+    //         }
+    //       }
 
 
-        ]
-      }
-    })
+    //     ]
+    //   }
+    // })
   },
   getSummarySupervisor: function (request, reply) {
     return reply.response({
@@ -1080,133 +1053,4 @@ module.exports = {
   }
 
 };
-
-function isNotEmpty(str) {
-  if (str == null || str == undefined || str == '') {
-    return false
-  }
-  return true
-}
-
-function convertShift(flag) {
-  if (flag == 'Y') {
-    return '170'
-  } else {
-    return '0.00'
-  }
-}
-function convertTran(flag) {
-  if (flag == 'Y') {
-    return '200'
-  } else {
-    return '0.00'
-  }
-}
-
-function convertOT(ot) {
-  if (ot == 0) {
-    return '0.00'
-  } else {
-    return ot
-  }
-}
-
-function getObjRecordDaily() {
-  return record = {
-    id: '',
-    date: '',
-    recordType: '',
-    schedule: {
-      start: '',
-      end: ''
-    },
-    ot: {
-      start: '',
-      end: ''
-    },
-    actual:
-      {
-        clockIn: '',
-        clockOut: ''
-      },
-    trans: '',
-    shift: '',
-    otHours:
-      {
-        ot1: '',
-        ot15: '',
-        ot3: ''
-      },
-    remark: '',
-    updatedDate: '',
-    updatedBy: ''
-  }
-}
-
-function toEmployeeDetail(employeeInfo) {
-
-  // find bu and department
-  var fc, sc, bl, bu, dp, co;
-
-  if (employeeInfo.organizeInfoList && employeeInfo.organizeInfoList.length > 0) {
-    employeeInfo.organizeInfoList.forEach(function (organizeInfo) {
-      if (organizeInfo.orgLevel == 'BU') {
-        bu = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
-      } else if (organizeInfo.orgLevel == 'BL') {
-        bl = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
-      } else if (organizeInfo.orgLevel == 'DP') {
-        dp = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
-      } else if (organizeInfo.orgLevel == 'CO') {
-        co = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
-      } else if (organizeInfo.orgLevel == 'FC') {
-        fc = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
-      } else if (organizeInfo.orgLevel == 'SC') {
-        sc = organizeInfo.orgName + "(" + organizeInfo.orgDesc + ")";
-      }
-    });
-  }
-
-  return {
-    pin: employeeInfo.pin,
-    name: employeeInfo.nameEng + ' ' + employeeInfo.surnameEng,
-    bl: bl,
-    company: co || employeeInfo.companyName,
-    bu: bu,
-    department: dp,
-    sc : sc,
-    fc : fc
-  }
-}
-
-function objToJsonDaily(employeeInfo, obj, reply) {
-  // console.log(reply)
-  let employeeInfoResp = {
-    employeeDetail: toEmployeeDetail(employeeInfo),
-    resultRecord: []
-  }
-
-  for (let rec of obj) {
-    let record = getObjRecordDaily();
-    record.date = moment(rec.recordDate).format('DD/MM/YYYY')
-    record.recordType = rec.recordType
-    record.schedule.start = isNotEmpty(rec.scheduleStartDt) ? moment(rec.scheduleStartDt).format(formatTimeReport) : ''
-    record.schedule.end = isNotEmpty(rec.scheduleEndDt) ? moment(rec.scheduleEndDt).format(formatTimeReport) : ''
-    record.ot.start = isNotEmpty(rec.otStartDt) ? moment(rec.otStartDt).format(formatTimeReport) : ''
-    record.ot.end = isNotEmpty(rec.otEndDt) ? moment(rec.otEndDt).format(formatTimeReport) : ''
-    record.actual.clockIn = isNotEmpty(rec.actualClockinDt) ? moment(rec.actualClockinDt).format(formatTimeReport) : ''
-    record.actual.clockOut = isNotEmpty(rec.actualClockoutDt) ? moment(rec.actualClockoutDt).format(formatTimeReport) : ''
-    record.trans = convertTran(rec.transportFlag)
-    record.shift = convertShift(rec.shiftFlag)
-    record.otHours.ot1 = convertOT(rec.ot10)
-    record.otHours.ot15 = convertOT(rec.ot15)
-    record.otHours.ot3 = convertOT(rec.ot30)
-    record.remark = rec.remark
-    record.updatedDate = isNotEmpty(rec.createDt) ? moment(rec.createDt).format('DD/MM/YYYY') : ''
-    record.updatedBy = rec.createBy
-
-    employeeInfoResp.resultRecord.push(record)
-  }
-
-  return employeeInfoResp
-}
 

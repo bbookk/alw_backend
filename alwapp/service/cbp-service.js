@@ -550,7 +550,13 @@ module.exports.getManagerByPin = (pin) => {
 
                                 // agentInfoResp.GetManagerByPINResult.diffgram.NewDataSet.Table
                                 // create manager (agent) info by using first item in list
-                                var agentInfoResp = toAgentInfo(result.GetManagerByPINResult.diffgram.NewDataSet.Table[0]);
+                                var agentInfoResp;
+                                
+                                if (result.GetManagerByPINResult.diffgram.NewDataSet.Table.length) {
+                                    agentInfoResp = toAgentInfo(result.GetManagerByPINResult.diffgram.NewDataSet.Table[0]);
+                                } else {
+                                    agentInfoResp = toAgentInfo(result.GetManagerByPINResult.diffgram.NewDataSet.Table);
+                                }
 
                                 // simplify manager to be like agent
                                 agentInfoResp.pin = agentInfoResp.managerPin;
@@ -565,13 +571,15 @@ module.exports.getManagerByPin = (pin) => {
                                 // next create agent lower info list for each supervisor under this manager
                                 var agentLowerInfoList = [];
 
-                                result.GetManagerByPINResult.diffgram.NewDataSet.Table.forEach( function(item) {
-                                    var supervisorInfo = toAgentInfo(item);
-                                    supervisorInfo.pin = supervisorInfo.supervisorPin;
-                                    supervisorInfo.fullName = supervisorInfo.supervisorFullName;
+                                if (result.GetManagerByPINResult.diffgram.NewDataSet.Table.length) {
+                                    result.GetManagerByPINResult.diffgram.NewDataSet.Table.forEach( function(item) {
+                                        var supervisorInfo = toAgentInfo(item);
+                                        supervisorInfo.pin = supervisorInfo.supervisorPin;
+                                        supervisorInfo.fullName = supervisorInfo.supervisorFullName;
 
-                                    agentLowerInfoList.push(supervisorInfo);
-                                });
+                                        agentLowerInfoList.push(supervisorInfo);
+                                    });
+                                }
 
                                 agentInfoResp.agentLowerInfoList = agentLowerInfoList;
 

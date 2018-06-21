@@ -1,10 +1,10 @@
 {
     "local": {
-        "localPathSL": "D:/data/local/SL/",
-        "localPathTR": "D:/data/local/TR/",
-        "localPath": "D:/data/local/",
-        "nasPath": "D:/data/NAS/",
-        "archive": "D:/archire/",
+        "localPathSL": "C:/Users/dell-2018/Desktop/alw/app/alw/data/SL/",
+        "localPathTR": "C:/Users/dell-2018/Desktop/alw/app/alw/data/TR/",
+        "localPath": "C:/Users/dell-2018/Desktop/alw/app/alw/data/",
+        "nasPath": "C:/Users/dell-2018/Desktop/NAS/",
+        "archive": "C:/Users/dell-2018/Desktop/alw/app/alw/archire/",
         "nasPathTR": "D:/data/NAS/TR/",
         "config_database": {
             "database": "alwsdb",

@@ -9,6 +9,8 @@ const txTrDetail = require('../models').TxTrDetail
 const txSummaryDetail = require('../models').TxSummaryDetail
 const infoSummaryCheck = require('../models').InfoSummaryCheck
 const Op = require('../models').Sequelize.Op;
+const sequelize = require('../models').sequelize;
+const infoAccess = require('../models').InfoAccess
 
 /*
    dependency
@@ -22,6 +24,8 @@ const arrayToTxtFile = require('array-to-txt-file')
 const logger = require('./log-service')
 const rdpService = require('./rdp-service')
 const omService = require('./om-service')
+const cbpService = require('./cbp-service')
+const employeeService = require('./employee-service')
 /*
    class
 */
@@ -50,6 +54,7 @@ const createDateTime = moment().format('YYYY-MM-DD HH:mm:ss')
 
 let objbyCond = {
     schedule: {},
+    scheduleOT: {},
     actualClock: {},
     flagPaid: {},
     objHour: {},
@@ -61,11 +66,11 @@ let objbyCond = {
     OT: { OT_1: '', OT1_5: '', OT_3: '' }
 }
 
-let objID = {
-    pin: '',
-    txDetailSLId: '',
-    txDetailTRId: ''
-}
+// let objID = {
+//     pin: '',
+//     txDetailSLId: '',
+//     txDetailTRId: ''
+// }
 
 
 module.exports = [
@@ -81,11 +86,44 @@ module.exports = [
 module.exports = [
     {
         method: 'GET', path: '/test', config: { auth: false }, handler: async function (request, reply) {
-            let workTime = moment('2017-01-0120:00:00', 'YYYY-MM-DD HH:mm:ss').add(8, 'hours'); // + 8 hour 
-            console.log(workTime)
-            let overlapDate = moment('2017-11-11', 'YYYY-MM-DD ' + format).add(1, 'day')
-            console.log(overlapDate)
-            return reply.response(workTime).code(200)
+            // let xxx = moment('2017-11-11').format('MM-YYYY');
+
+            // employeeService.getEmployeeDetailWithOrganizeByPin('00046118').then(obj => {
+            //     console.log(obj)
+            // }).catch(e => {
+            //     console.log(e + 'xxxx')
+            // })
+            // console.log(cons)
+
+            // employeeService.getEmployeeDetailWithOrganizeByPin('00038505').then(b => {
+
+            //     console.log('xxxx', b)
+            // }).catch(e => {
+
+            //     console.log(e)
+            // })
+            // txSummaryDetail.findAll({
+           
+            //     where:{
+            //         [Op.between] :[{
+            //             [Op.and]: [sequelize.where(sequelize.fn('date_part','month', sequelize.col('record_date')), '11'),sequelize.where(sequelize.fn('date_part','year', sequelize.col('record_date')), '2017')]
+            //         },{
+            //             [Op.and]: [sequelize.where(sequelize.fn('date_part','month', sequelize.col('record_date')), '12'),sequelize.where(sequelize.fn('date_part','year', sequelize.col('record_date')), '2017')]
+            //         }
+            //         ]
+            //     } 
+            // }).then(r => {
+            //     console.log(r)
+            // });
+            let nextDayxx = moment('2017-12-11').date(-1);
+            console.log(nextDayxx)
+
+            let nextDay = moment('2017-11-11').date(0);
+            console.log(nextDay)
+            let nextDayg = moment('2017-02-11').date(-1);
+            let nn = moment.max(nextDayg)
+console.log(nn)
+            return reply.response(nextDay).code(200)
         }
     }
 ];
@@ -105,6 +143,11 @@ processSummaryDetail = async (req, res) => {
     let mapPinAid = getMapPinAid(summaryCheck)
     let mapPinToAid = mapPinAid.pinToAid
     let mapAidToPin = mapPinAid.aidToPin
+
+    // infoSummary = {
+    //     slFlag: 'Y',
+    //     trFlag: 'Y'
+    // }
 
     for (let infoSummary of summaryCheck) {
         let employeeScheList = await mapData2Obj(infoSummary, mapAidToPin); // set data to obj by one record
@@ -138,31 +181,48 @@ processSummaryDetail = async (req, res) => {
                 let findIndexLeave = grupTypeSchedule.findIndex(e => { return e == 'Leave' })
                 if (findIndexWork >= 0) {  // still update SL,TR
                     console.log("case Lost AllDay")
+                    let recordToDB = [];
                     let sumaryDetailObj = setData2condLostAllDay(employeeScheList[0].activitySL, true, infoSummary.recordDt)
                     let scheduleDate = moment(infoSummary.recordDt).format('YYYY-MM-DD');
                     sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.recordMonth = spiltStringByKeyword(moment(scheduleDate).format('MM-YYYY'), '-');
                     sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.superPin = isNotEmpty(infoSummary.supervisorPin) ? infoSummary.supervisorPin : ''
+                    sumaryDetailObj.managerPin = isNotEmpty(infoSummary.managerPin) ? infoSummary.managerPin : ''
                     sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
-                    await saveData2DB(sumaryDetailObj.toObject())
+                    await getOrgCodeByPin(sumaryDetailObj.pin, sumaryDetailObj)
+                    recordToDB.push(sumaryDetailObj.toObject())
+                    await saveData2DB(recordToDB)
                 }
                 else if (findIndexLeave >= 0 && findIndexWork < 0) { //case leave all day 
                     console.log('case Leave')
+                    let recordToDB = [];
                     let sumaryDetailObj = await setData2condLeave(employeeScheList[0].activitySL, true, infoSummary.recordDt)
                     let scheduleDate = moment(infoSummary.recordDt).format('YYYY-MM-DD');
                     sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.recordMonth = spiltStringByKeyword(moment(scheduleDate).format('MM-YYYY'), '-');
                     sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.superPin = isNotEmpty(infoSummary.supervisorPin) ? infoSummary.supervisorPin : ''
+                    sumaryDetailObj.managerPin = isNotEmpty(infoSummary.managerPin) ? infoSummary.managerPin : ''
                     sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
-                    await saveData2DB(sumaryDetailObj.toObject())
+                    await getOrgCodeByPin(sumaryDetailObj.pin, sumaryDetailObj)
+                    recordToDB.push(sumaryDetailObj.toObject())
+                    await saveData2DB(recordToDB)
                 }
                 else if (findIndexSpecial >= 0 && findIndexWork < 0) { // case special all day 
                     console.log('Case Special activity All Day')
+                    let recordToDB = [];
                     sumaryDetailObj = setData2condAllDaySpecial(employeeScheList[0].activitySL, obj.overlapTime, infoSummary.recordDt)
                     let scheduleDate = moment(employeeScheList[0].scheduleDate).format('YYYY-MM-DD');
                     sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.recordMonth = spiltStringByKeyword(moment(scheduleDate).format('MM-YYYY'), '-');
                     sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.superPin = isNotEmpty(infoSummary.supervisorPin) ? infoSummary.supervisorPin : ''
+                    sumaryDetailObj.managerPin = isNotEmpty(infoSummary.managerPin) ? infoSummary.managerPin : ''
                     sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
-                    sumaryDetailObj.toObject()
-                    await saveData2DB(sumaryDetailObj.toObject())
+                    await getOrgCodeByPin(sumaryDetailObj.pin, sumaryDetailObj)
+                    recordToDB.push(sumaryDetailObj.toObject())
+                    await saveData2DB(recordToDB)
                 }
             } else if (!isTrue(infoSummary.slFlag) && !isTrue(infoSummary.trFlag)) { // case off
 
@@ -184,20 +244,30 @@ processSummaryDetail = async (req, res) => {
                 if (await isLeaveActivityAllDay(employeeScheList[0].activitySL)) {
                     let sumaryDetailObj = await setData2condLeave(employeeScheList[0].activitySL, true, infoSummary.recordDt)
                     let scheduleDate = moment(infoSummary.recordDt).format('YYYY-MM-DD');
+                    let recordToDB = [];
                     sumaryDetailObj.recordDate = scheduleDate
+                    sumaryDetailObj.recordMonth = spiltStringByKeyword(moment(scheduleDate).format('MM-YYYY'), '-');
                     sumaryDetailObj.pin = isNotEmpty(employeeScheList[0].pin) ? employeeScheList[0].pin : ''
+                    sumaryDetailObj.superPin = isNotEmpty(infoSummary.supervisorPin) ? infoSummary.supervisorPin : ''
+                    sumaryDetailObj.managerPin = isNotEmpty(infoSummary.managerPin) ? infoSummary.managerPin : ''
                     sumaryDetailObj.txDetailSLId = isNotEmpty(employeeScheList[0].headerSL) ? employeeScheList[0].headerSL : ''
-                    await saveData2DB(sumaryDetailObj.toObject())
+                    await getOrgCodeByPin(sumaryDetailObj.pin, sumaryDetailObj)
+                    recordToDB.push(sumaryDetailObj.toObject())
+                    await saveData2DB(recordToDB)
                 }
                 else {
                     for (let obj of employeeScheList) {
                         /* Case have TR and SL */
                         if (isNotEmpty(obj.activityTR) && isNotEmpty(obj.activitySL)) {
                             if (obj.overlapTime) {
-                                let schedule = await findScheduleStartEnd(obj.activitySL, 'normal')   // find schedule start - end for spilt tr to new array 
-                                obj.activityTR = mapTRbySLDaily(schedule, obj.activityTR);   // new Array TR by Schedule SL ,Support case overlap
+                                let schedule = await findScheduleForSpiltTR(obj.activitySL)   // find schedule start - end for spilt tr to new array 
+
+                                obj.activityTR = mapTRbySLDaily(schedule, obj.activityTR, obj.scheduleDate);   // new Array TR by Schedule SL ,Support case overlap
                                 console.log('Tr Activity with overlap:', obj.activityTR)
                             }
+                            obj.supervisorPin = isNotEmpty(infoSummary.supervisorPin) ? infoSummary.supervisorPin : ''
+                            obj.managerPin = isNotEmpty(infoSummary.managerPin) ? infoSummary.managerPin : ''
+                            fullScanMidNight(obj.activityTR, obj.scheduleDate)
                             //let isLeave = await isLeaveActivity(obj.activitySL)
                             await processWithCond(obj.activitySL, obj.activityTR, obj.overlapTime, grupTypeSchedule, listMstActivity, setID(obj), isHolidayFlag);  //return ot hour and record type  and hour and late 
 
@@ -255,27 +325,27 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
         console.log('OT Compensate')
         if (cond.scheOT == 1 && cond.work) {      // spilt 3 case  Normal ,  Normal +OT , OT Before After 
             /* Schedule Normal + OT, one record by RecordType = 'ON' */
-            return normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, true, objID)
+            return normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, true, objID, overlapTime)
         } else if (cond.scheOT == 2 && cond.work) {
             /* Schedule duration 2 OT , three record by RecordType = 'ON' , 'OT ก่อน' , 'OT หลัง' */
-            return duration2OT(listSL, listTR, listMstActivity, flagPaid, true, objID)
+            return duration2OT(listSL, listTR, listMstActivity, flagPaid, true, objID, overlapTime)
         } else if (cond.scheOT == 0 && cond.work) {
             /* ScheduleNormal , one record by RecordType = 'ON' */
-            return normalCond(listSL, listTR, listMstActivity, flagPaid, true, objID)
+            return normalCond(listSL, listTR, listMstActivity, flagPaid, true, objID, overlapTime)
         }
 
     }
     if (cond.scheOT == 1 && cond.work && !cond.isHoliday) {
         /* Schedule Normal + OT, one record by RecordType = 'ON' */
-        return normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, false, objID)
+        return normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, false, objID, overlapTime)
     }
     if (cond.scheOT == 2 && cond.work && !cond.isHoliday) {
         /* Schedule duration 2 OT , three record by RecordType = 'ON' , 'OT ก่อน' , 'OT หลัง' */
-        return duration2OT(listSL, listTR, listMstActivity, flagPaid, false, objID)
+        return duration2OT(listSL, listTR, listMstActivity, flagPaid, false, objID, overlapTime)
     }
     if (cond.scheOT == 0 && cond.work && !cond.isHoliday) {
         /* ScheduleNormal , one record by RecordType = 'ON' */
-        return normalCond(listSL, listTR, listMstActivity, flagPaid, false, objID)
+        return normalCond(listSL, listTR, listMstActivity, flagPaid, false, objID, overlapTime)
     }
     // if (cond.isLeaveAllDay && !cond.isHoliday) {
     //     /* Leave All Day , one record by RecordType = 'OTCOM' */
@@ -284,12 +354,12 @@ async function processWithCond(listSL, listTR, overlapTime, grupTypeSchedule, li
 }
 
 
-async function normalCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+async function normalCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID, overlapTime) {
     /* ScheduleNormal , one record by RecordType = 'ON' */
     console.log('Normal Work')
     let schedule = await findScheduleStartEnd(listSL, 'normal')   // Schedule start - end 
     console.log('schedule:', schedule)
-    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity)// Actual clock in - out ,lost and late 
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity, objID.scheduleDate, overlapTime)// Actual clock in - out ,lost and late 
     console.log('actualClock:', actualClock)
     let objTime = getTimeLostOrlate(schedule, actualClock);
     resetObjCond();
@@ -317,7 +387,7 @@ async function otComLeaveAllDay(listSL, listTR, listMstActivity, flagPaid, isOTC
     console.log('otComLeaveAllDay')
     let schedule = await findScheduleStartEndLeaveAllDay(listSL, 'OTCOM')   // Schedule start - end 
     console.log('schedule:', schedule)
-    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity)// Actual clock in - out ,lost and late 
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity, objID.scheduleDate, overlapTime)// Actual clock in - out ,lost and late 
     console.log('actualClock:', actualClock)
     let objHour = getHourOTComAllLeaveDay(listTR, listMstActivity)
     let objTime = getTimeLostOrlate(schedule, actualClock);
@@ -332,17 +402,17 @@ async function otComLeaveAllDay(listSL, listTR, listMstActivity, flagPaid, isOTC
 }
 
 
-async function normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+async function normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID, overlapTime) {
 
     console.log('Normal Overtime')
     let schedule = await findScheduleStartEnd(listSL, 'normal')   // Schedule start - end 
     console.log('schedule:', schedule)
-    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity) // Actual clock in - out ,lost and late 
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity, objID.scheduleDate, overlapTime) // Actual clock in - out ,lost and late 
     console.log('actualClock:', actualClock)
 
     let scheduleOT = await findScheduleStartEnd(listSL, 'ot')
     console.log('scheduleOT', scheduleOT)
-    let actualClockOT = findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, schedule)
+    let actualClockOT = findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, schedule, objID.scheduleDate, overlapTime)
     console.log('actualClockOT', actualClockOT)
     let tr = await splitActivityTRBySL(listSL, listTR, 'OT', listMstActivity, schedule, scheduleOT)
     console.log('arr TR:', tr.work.length)
@@ -369,11 +439,11 @@ async function normalWithOTCond(listSL, listTR, listMstActivity, flagPaid, isOTC
 
 }
 
-async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID) {
+async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, objID, overlapTime) {
     console.log('OT Befor After')
     let schedule = await findScheduleStartEnd(listSL, 'normal') //ช่วงเวลาทำงานปกติของพนักงาน ตามไฟล์ SL
     console.log('schedule normal:', schedule)
-    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity) // เวลาทำงานจริงๆของพนักงาน ตามไฟล์ SL
+    let actualClock = findActualClockFromTR(schedule, listTR, listMstActivity, objID.scheduleDate, overlapTime) // เวลาทำงานจริงๆของพนักงาน ตามไฟล์ SL
     console.log('actualClock normal:', actualClock)
     let scheduleOT = await findScheduleStartEnd(listSL, '2OT')
     console.log('schedule ot:', scheduleOT)
@@ -383,9 +453,10 @@ async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, o
     console.log('actualClockAfter:', actualClockAfter)
     let tr = await splitActivityTRBySL(listSL, listTR, '2OT', listMstActivity, schedule, scheduleOT)
     let objHour = beforeAfterOT(tr, listMstActivity, actualClock)
-
+    let objTime = getTimeLostOrlate(schedule, actualClock);  // get min - hour for case late or lost
     resetObjCond();
     objbyCond.schedule = schedule
+    objbyCond.scheduleOT = scheduleOT
     objbyCond.flagPaid = flagPaid
     objbyCond.actualClock = actualClock
     //objbyCond.isLeave = cond.isLeave
@@ -444,21 +515,28 @@ async function duration2OT(listSL, listTR, listMstActivity, flagPaid, isOTCOM, o
 //         }
 //     }
 // }
-function mapTRbySLDaily(listSL, listTR) {
+function mapTRbySLDaily(listSL, listTR, scheduleDate) {
     let listTRDaily = [];
     // for (let i = 0; i < listSL.length; i++) {
-    let momentActSLEnd = moment(listSL[i].end, format);// sl end
-    let momentActSLStart = moment(listSL[i].start, format);// sl start
+    let momentActSLEnd = moment(scheduleDate + listSL.end, 'YYYY-MM-DD ' + format).add(1, 'days')// sl end
+    let momentActSLStart = moment(scheduleDate + listSL.start, 'YYYY-MM-DD ' + format);// sl start
+    let midNight = moment(scheduleDate, 'YYYY-MM-DD ' + format)
     //listMstActivity.forEach(e => {
     // if (checkActivityByGrup('Work', listMstActivity, listSL[i].activityName)
     //     || checkActivityByGrup('Meal', listMstActivity, listSL[i].activityName)) { //case work activity
     for (let j = 0; j < listTR.length; j++) {
-        let momentActTREnd = moment(listTR[j].end, format);   // tr end
-        let momentActTRStart = moment(listTR[j].start, format);  //tr start
-        if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
-            || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
-            || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
-        ) {
+        let momentActTREnd = moment(listTR[j].scheduleDate + listTR[j].end, 'YYYY-MM-DD' + format);   // tr end
+        let momentActTRStart = moment(listTR[j].scheduleDate + listTR[j].start, 'YYYY-MM-DD' + format);  //tr start
+        // if (((momentActSLEnd.isSame(momentActTREnd) || momentActTREnd.isBefore(momentActSLEnd)) && (momentActSLStart.isSame(momentActTRStart) || momentActTRStart.isAfter(momentActSLStart)))
+        //     || (momentActTRStart.isBefore(momentActSLStart) && (momentActTREnd.isAfter(momentActSLStart)))   // case activity momemnt overlap SL start  
+        //     || (momentActTRStart.isBefore(momentActSLEnd) && momentActTREnd.isAfter(momentActSLEnd)) // case activity momemnt overlap SL end
+        // ) 
+        if (((momentActTRStart.isBefore(momentActSLStart) || momentActTRStart.isSame(momentActSLStart)) && (momentActTREnd.isBetween(momentActSLStart, momentActSLEnd) || midNight.isSame(momentActTREnd)))
+            || ((momentActTRStart.isBetween(momentActSLStart, momentActSLEnd)) && ((momentActTREnd.isBetween(momentActSLStart, momentActSLEnd)) || midNight.isSame(momentActTREnd)))
+            || ((momentActTRStart.isBetween(momentActSLStart, momentActSLEnd)) && ((momentActTREnd.isAfter(momentActSLEnd)) || midNight.isSame(momentActTREnd)))
+        )
+        // case activity momemnt overlap SL end
+        {
             //listAcivityTR.work.push(listTR[j])
             listTRDaily.push(listTR[j])
         }
@@ -910,46 +988,61 @@ function normalWork(listTR, listMstActivity, type, actualClock) {
 
 
 
-function findActualClockFromTR(schedule, listTR, listMstActivity) {
+function findActualClockFromTR(schedule, listTR, listMstActivity, scheduleDate, overlapTime) {
+
     let actualClockObj = {
         start: '',
         end: '',
         lost: false,
         late: false
     }
+    let scheduleStart, scheduleEnd;
+    /* special case ,*/
+    let midNight = moment(scheduleDate, 'YYYY-MM-DD ' + format);
 
-    let scheduleStart = moment(schedule.start, format);
-    let scheduleEnd = moment(schedule.end, format);
+    if (overlapTime) {
+        scheduleStart = moment(scheduleDate + schedule.start, 'YYYY-MM-DD ' + format);
+        scheduleEnd = midNightToNextDay(moment(scheduleDate + schedule.end, 'YYYY-MM-DD ' + format).add(1, 'day'))
+
+    } else {
+        scheduleStart = moment(scheduleDate + schedule.start, 'YYYY-MM-DD ' + format);
+        scheduleEnd = midNightToNextDay(moment(scheduleDate + schedule.end, 'YYYY-MM-DD ' + format));
+    }
 
     let counter = 0;
     listTR.forEach(tr => {
-        let timeRecordStart = moment(tr.start, format);
-        let timeRecordEnd = moment(tr.end, format);
+        let timeRecordStart = moment(tr.scheduleDate + tr.start, 'YYYY-MM-DD ' + format);
+        let timeRecordEnd = moment(tr.scheduleDate + tr.end, 'YYYY-MM-DD ' + format);
         listMstActivity.forEach(mstAct => {
             if (tr.activityName == mstAct.activityName && mstAct.groupType == 'Work') {
+                // if ((counter == 0) && (scheduleStart.isBetween(timeRecordStart, timeRecordEnd) || (timeRecordEnd.isSame(midNight) && timeRecordStart.isBefore(scheduleStart)))
                 if ((counter == 0) && scheduleStart.isBetween(timeRecordStart, timeRecordEnd)
                     || scheduleStart.isSame(timeRecordStart)
                     || scheduleStart.isSame(timeRecordEnd)) { //  sl is between tr
                     counter++
-
+                    console.log(1)
                     actualClockObj.start = tr.start
                     actualClockObj.end = tr.end
                     actualClockObj.late = false
                 }
                 else if ((counter == 0) && (scheduleStart.isBefore(timeRecordStart) || scheduleStart.isSame(timeRecordStart))) {//  sl is before tr
                     counter++
+                    console.log(2)
                     actualClockObj.start = tr.start
                     actualClockObj.end = tr.end
                     actualClockObj.late = true
                 }
                 else if ((counter > 0) && (scheduleEnd.isBetween(timeRecordStart, timeRecordEnd)
+
                     || scheduleEnd.isSame(timeRecordStart)
                     || scheduleEnd.isSame(timeRecordEnd))) {
                     // actualClockObj.start = tr.start
+                    console.log(3)
                     actualClockObj.end = tr.end
                     actualClockObj.lost = false
                 } else if ((counter > 0) && (scheduleEnd.isAfter(timeRecordEnd))) {  //case lost
                     //actualClockObj.start = tr.start
+                    console.log(4)
                     actualClockObj.end = tr.end
                     actualClockObj.lost = true
                 } else {
@@ -965,7 +1058,7 @@ function findActualClockFromTR(schedule, listTR, listMstActivity) {
     return actualClockObj
 }
 
-function findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, normalSchedule) {
+function findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, normalSchedule, scheduleDate, overlapTime) {
     let actualClockObj = {
         start: '',
         end: '',
@@ -974,20 +1067,33 @@ function findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, normalSche
     }
 
     let arrCheckOverlapSchd = []
-    let scheduleOTStart = moment(scheduleOT.start, format);
-    let scheduleOTEnd = moment(scheduleOT.end, format);
+    // let scheduleOTStart = moment(scheduleOT.start, format);
+    // let scheduleOTEnd = moment(scheduleOT.end, format);
+    let scheduleOTStart, scheduleOTEnd;
+
+    /* special case ,*/
+    let midNight = moment(scheduleDate, 'YYYY-MM-DD ' + format);
+
+    if (overlapTime) {
+        scheduleOTStart = moment(scheduleDate + scheduleOT.start, 'YYYY-MM-DD ' + format);
+        scheduleOTEnd = moment(scheduleDate + scheduleOT.end, 'YYYY-MM-DD ' + format)//.add(1, 'day')
+
+    } else {
+        scheduleOTStart = moment(scheduleDate + scheduleOT.start, 'YYYY-MM-DD ' + format);
+        scheduleOTEnd = moment(scheduleDate + scheduleOT.end, 'YYYY-MM-DD ' + format);
+    }
 
     let counter = 0;
     listTR.forEach(tr => {
-        let timeRecordStart = moment(tr.start, format);
-        let timeRecordEnd = moment(tr.end, format);
+        let timeRecordStart = moment(tr.scheduleDate + tr.start, 'YYYY-MM-DD ' + format);
+        let timeRecordEnd = moment(tr.scheduleDate + tr.end, 'YYYY-MM-DD ' + format);
         listMstActivity.forEach(mstAct => {
             if (tr.activityName == mstAct.activityName && mstAct.groupType == 'Work') {
-                if ((counter == 0) && scheduleOTStart.isBetween(timeRecordStart, timeRecordEnd)
+                if ((counter == 0) && (scheduleOTStart.isBetween(timeRecordStart, timeRecordEnd) || (timeRecordEnd.isSame(midNight) && timeRecordStart.isBefore(scheduleOTStart)))
                     || scheduleOTStart.isSame(timeRecordStart)
                     || scheduleOTStart.isSame(timeRecordEnd)) { //  sl is between tr
                     counter++
-
+                    console.log(1)
                     actualClockObj.start = tr.start
                     // actualClockObj.late = false
                     arrCheckOverlapSchd.push(tr)
@@ -996,18 +1102,18 @@ function findActualClockOTFromTR(scheduleOT, listTR, listMstActivity, normalSche
                 else if ((counter == 0) && (scheduleOTStart.isBefore(timeRecordStart) || scheduleOTStart.isSame(timeRecordStart))) {//  sl is before tr
                     counter++
                     actualClockObj.start = tr.start
-                    //  actualClockObj.late = true
+                    console.log(2)
                     arrCheckOverlapSchd.push(tr)
                 }
                 else if ((counter > 0) && (scheduleOTEnd.isBetween(timeRecordStart, timeRecordEnd)
                     || scheduleOTEnd.isSame(timeRecordStart)
                     || scheduleOTEnd.isSame(timeRecordEnd))) {
                     actualClockObj.end = tr.end
-                    //  actualClockObj.lost = false
+                    console.log(3)
                     arrCheckOverlapSchd.push(tr)
                 } else if ((counter > 0) && (scheduleOTEnd.isAfter(timeRecordEnd))) {  //case lost
                     actualClockObj.end = tr.end
-                    //  actualClockObj.lost = true
+                    console.log(4)
                     arrCheckOverlapSchd.push(tr)
                 } else {
                     //console.log('findActualClockFromTR: tr not match to moment SL ')
@@ -1094,6 +1200,20 @@ checkOverlapOT = (schedule, scheduleOT, listOT) => {
     //return listOT //list tr is overlap
 }
 
+function findScheduleForSpiltTR(listSL) {
+
+    let scheduleObj = {
+        start: '',
+        end: ''
+    }
+
+    scheduleObj.start = listSL[0].start
+    scheduleObj.end = listSL[listSL.length - 1].end
+
+
+    return scheduleObj
+
+}
 async function findScheduleStartEnd(listSL, type) {
 
     let scheduleObj = {
@@ -1200,10 +1320,13 @@ function isOTCompensate(listSL, listTR) {
 }
 
 function setID(obj) {
+    let objID = {};
     objID.pin = isNotEmpty(obj.pin) ? obj.pin : ''
     objID.txDetailSLId = isNotEmpty(obj.headerSL) ? obj.headerSL : ''
     objID.txDetailTRId = isNotEmpty(obj.headerTR) ? obj.headerTR : ''
     objID.scheduleDate = isNotEmpty(obj.scheduleDate) ? obj.scheduleDate : ''
+    objID.supervisorPin = isNotEmpty(obj.supervisorPin) ? obj.supervisorPin : ''
+    objID.managerPin = isNotEmpty(obj.managerPin) ? obj.managerPin : ''
     console.log('objID:', objID)
     logger.debug(objID)
     return objID
@@ -1448,9 +1571,89 @@ function sortTime(list, overlap) {
     }
 }
 
+async function setData2DBCase2OT(objbyCond, rec) {
+    let beforeOT = new SummaryInfo('ON')
+    let afterOT = new SummaryInfo('ON')
+    let modelSummaryDetail = [];
+    /* 
+     Begin set Default Value for case 2 OT 
+     */
+    beforeOT.pin = rec.pin
+    beforeOT.txDetailSLId = rec.txDetailSLId
+    beforeOT.txDetailTRId = rec.txDetailTRId
+    beforeOT.recordDate = rec.recordDate
+    beforeOT.createDt = rec.createDt
+    beforeOT.recordMonth = rec.recordMonth
+    beforeOT.recordType = 'OT Before'
+    beforeOT.remark = ''
+    await getOrgCodeByPin(beforeOT.pin, beforeOT)
+    //beforeOT.shiftFlag = rec.shiftFlag
+    //beforeOT.transportFlag = rec.transportFlag
+
+    afterOT.pin = rec.pin
+    afterOT.txDetailSLId = rec.txDetailSLId
+    afterOT.txDetailTRId = rec.txDetailTRId
+    afterOT.recordDate = rec.recordDate
+    afterOT.createDt = rec.createDt
+    afterOT.recordMonth = rec.recordMonth
+    afterOT.recordType = 'OT After'
+    afterOT.remark = ''
+    await getOrgCodeByPin(afterOT.pin, afterOT)
+    //beforeOT.shiftFlag = rec.shiftFlag
+    // beforeOT.transportFlag = rec.transportFlag
+    /* 
+         End set Default Value for case 2 OT 
+    */
 
 
-function setData2DB(type, objbyCond, objID) {
+    if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
+        let otBefore = objbyCond.actualClockOT.actualClockBefore;
+        if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
+            beforeOT.otStartDt = changeFormatDate(rec.recordDate + " " + otBefore.start, 'YYYY-MM-DD' + " " + format)
+            beforeOT.otEndDt = changeFormatDate(rec.recordDate + " " + otBefore.end, 'YYYY-MM-DD' + " " + format)
+        }
+    }
+
+    if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
+        let otAfter = objbyCond.actualClockOT.actualClockAfter;
+        if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
+            afterOT.otStartDt = changeFormatDate(rec.recordDate + " " + otAfter.start, 'YYYY-MM-DD' + " " + format)
+            afterOT.otEndDt = changeFormatDate(rec.recordDate + " " + otAfter.end, 'YYYY-MM-DD' + " " + format)
+        }
+    }
+
+    if (isNotEmpty(objbyCond.scheduleOT.before)) {
+        let scheduleBefore = objbyCond.scheduleOT.before;
+        if (isNotEmpty(scheduleBefore.start) && isNotEmpty(scheduleBefore.end)) {
+            beforeOT.scheduleStartDt = changeFormatDate(rec.recordDate + " " + scheduleBefore.start, 'YYYY-MM-DD' + " " + format)
+            beforeOT.scheduleEndDt = changeFormatDate(rec.recordDate + " " + scheduleBefore.end, 'YYYY-MM-DD' + " " + format)
+        }
+    }
+
+    if (isNotEmpty(objbyCond.scheduleOT.after)) {
+        let scheduleAfter = objbyCond.scheduleOT.after;
+        if (isNotEmpty(scheduleAfter.start) && isNotEmpty(scheduleAfter.end)) {
+            afterOT.scheduleStartDt = changeFormatDate(rec.recordDate + " " + scheduleAfter.start, 'YYYY-MM-DD' + " " + format)
+            afterOT.scheduleEndDt = changeFormatDate(rec.recordDate + " " + scheduleAfter.end, 'YYYY-MM-DD' + " " + format)
+        }
+    }
+
+    if (objbyCond.objHour.isPaid) {
+        beforeOT.ot30 = objbyCond.objHour.otBefore
+        afterOT.ot30 = objbyCond.objHour.otAfter
+    } else {
+        beforeOT.ot15 = objbyCond.objHour.otBefore
+        afterOT.ot15 = objbyCond.objHour.otAfter
+    }
+
+    modelSummaryDetail.push(beforeOT.toObject())
+    modelSummaryDetail.push(afterOT.toObject())
+
+    return modelSummaryDetail
+
+}
+
+async function setData2DB(type, objbyCond, objID) {
     //let rec = recordType(type)
     let rec = new SummaryInfo(type)
     let modelSummaryDetail = [];
@@ -1459,6 +1662,15 @@ function setData2DB(type, objbyCond, objID) {
     rec.txDetailTRId = objID.txDetailTRId
     rec.recordDate = objID.scheduleDate
     rec.createDt = createDateTime
+    rec.recordMonth = spiltStringByKeyword(moment(rec.recordDate).format('MM-YYYY'), '-');
+    rec.superPin = objID.supervisorPin
+    rec.managerPin = objID.managerPin
+    await getOrgCodeByPin(rec.pin, rec)
+    // rec.cmpy =
+    // rec.bu =
+    // rec.dp =
+    // rec.section=
+    // rec.fn=
 
     if (type == 'ON') {
         if (objbyCond.objHour.isPaid) {
@@ -1486,46 +1698,20 @@ function setData2DB(type, objbyCond, objID) {
         rec.shiftFlag = changeFormatBoolean(objbyCond.flagPaid.shift)
         rec.transportFlag = changeFormatBoolean(objbyCond.flagPaid.transport)
         rec.ot30 = '0.00';
-        rec.recordMonth = '';
         rec.remark = '';
         rec.createBy = 'Batch';
-        modelSummaryDetail.push(rec)
+        modelSummaryDetail.push(rec.toObject())
 
         if (objbyCond.is2OT) {
-            let beforeOT = new SummaryInfo('ON')
-            let afterOT = new SummaryInfo('ON')
-            // let beforeOT = recordType('2OT')
-            // let afterOT = recordType('2OT')
-            if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
-                let otBefore = objbyCond.actualClockOT.actualClockBefore;
-                if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
-                    beforeOT.otStartDt = changeFormatDate(rec.recordDate + " " + otBefore.start, 'YYYY-MM-DD' + " " + format)
-                    beforeOT.otEndDt = changeFormatDate(rec.recordDate + " " + otBefore.end, 'YYYY-MM-DD' + " " + format)
-                }
-            }
+            let rec2OT = setData2DBCase2OT(objbyCond, rec)
+            // modelSummaryDetail.concat(rec2OT)
+            rec2OT.forEach(e => {
+                modelSummaryDetail.push(e)
+            })
 
-            if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
-                let otAfter = objbyCond.actualClockOT.actualClockAfter;
-                if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
-                    afterOT.otStartDt = changeFormatDate(rec.recordDate + " " + otAfter.start, 'YYYY-MM-DD' + " " + format)
-                    afterOT.otEndDt = changeFormatDate(rec.recordDate + " " + otAfter.end, 'YYYY-MM-DD' + " " + format)
-                }
-            }
-
-            if (objbyCond.objHour.isPaid) {
-                beforeOT.ot30 = objbyCond.objHour.otBefore
-                afterOT.ot30 = objbyCond.objHour.otAfter
-            } else {
-                beforeOT.ot15 = objbyCond.objHour.otBefore
-                afterOT.ot15 = objbyCond.objHour.otAfter
-            }
-
-            modelSummaryDetail.push(beforeOT)
-            modelSummaryDetail.push(afterOT)
         }
-        console.log(modelSummaryDetail)
 
-        return saveData2DB(rec.toObject())
+        return saveData2DB(modelSummaryDetail)
     }
     else if (type == 'AutoOT') {
         rec.pin = objID.pin
@@ -1572,28 +1758,12 @@ function setData2DB(type, objbyCond, objID) {
         rec.recordMonth = '';
         rec.remark = '';
         rec.createBy = 'Batch';
-        modelSummaryDetail.push(rec)
+        modelSummaryDetail.push(rec.toObject())
         if (objbyCond.is2OT) {
-            let beforeOT = recordType('2OT')
-            let afterOT = recordType('2OT')
-            if (isNotEmpty(objbyCond.actualClockOT.actualClockBefore)) {
-                let otBefore = objbyCond.actualClockOT.actualClockBefore;
-                if (isNotEmpty(otBefore.start) && isNotEmpty(otBefore.end)) {
-                    beforeOT.otStartDt = changeFormatDate(rec.recordDate + " " + otBefore.start, 'YYYY-MM-DD' + " " + format)
-                    beforeOT.otEndDt = changeFormatDate(rec.recordDate + " " + otBefore.end, 'YYYY-MM-DD' + " " + format)
-                }
-            }
-
-            if (isNotEmpty(objbyCond.actualClockOT.actualClockAfter)) {
-                let otAfter = objbyCond.actualClockOT.actualClockAfter;
-                if (isNotEmpty(otAfter.start) && isNotEmpty(otAfter.end)) {
-                    afterOT.otStartDt = changeFormatDate(rec.recordDate + " " + otAfter.start, 'YYYY-MM-DD' + " " + format)
-                    afterOT.otEndDt = changeFormatDate(rec.recordDate + " " + otAfter.end, 'YYYY-MM-DD' + " " + format)
-                }
-            }
-
-            modelSummaryDetail.push(beforeOT)
-            modelSummaryDetail.push(afterOT)
+            let rec2OT = setData2DBCase2OT(objbyCond, rec)
+            rec2OT.forEach(e => {
+                modelSummaryDetail.push(e)
+            })
         }
 
         return saveData2DB(rec.toObject())
@@ -1633,9 +1803,6 @@ function setData2DB(type, objbyCond, objID) {
         // console.log(modelSummaryDetail)
 
         return saveData2DB(rec.toObject())
-
-
-
     }
     // let pass = false
     // modelSummaryDetail.every(e => {
@@ -1660,21 +1827,21 @@ function setData2DB(type, objbyCond, objID) {
 
 function saveData2DB(modelSummaryDetail) {
 
-
+    console.log(modelSummaryDetail)
 
     let whereInfosummary = {
-        pin: modelSummaryDetail.pin,
-        recordDt: moment(modelSummaryDetail.recordDate).format('YYYY-MM-DD'),
+        pin: modelSummaryDetail[0].pin,
+        recordDt: moment(modelSummaryDetail[0].recordDate).format('YYYY-MM-DD'),
     }
-    if (isNotEmpty(modelSummaryDetail.txDetailSLId)) {
-        whereInfosummary['slHeaderId'] = modelSummaryDetail.txDetailSLId
+    if (isNotEmpty(modelSummaryDetail[0].txDetailSLId)) {
+        whereInfosummary['slHeaderId'] = modelSummaryDetail[0].txDetailSLId
     }
-    if (isNotEmpty(modelSummaryDetail.txDetailTRId)) {
-        whereInfosummary['trHeaderId'] = modelSummaryDetail.txDetailTRId
+    if (isNotEmpty(modelSummaryDetail[0].txDetailTRId)) {
+        whereInfosummary['trHeaderId'] = modelSummaryDetail[0].txDetailTRId
     }
     console.log(whereInfosummary)
     return new Promise((resolve, reject) => {
-        txSummaryDetail.create(modelSummaryDetail)
+        txSummaryDetail.bulkCreate(modelSummaryDetail)
             .then(obj => {
                 infoSummaryCheck.update({
                     genSumFlag: 'Y',
@@ -1729,11 +1896,12 @@ function mapData2Obj(summaryCheck, mapAidToPin) {
                         listEmployeeTR.headerTR = tr.headerId
                         listEmployeeTR.organizeName = tr.organizeName
                         listEmployeeTR.employeeName = tr.agentName
-                        listEmployeeTR.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
+                        // listEmployeeTR.scheduleDate = tr.scheduleDate  
+                        listEmployeeTR.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity, scheduleDate: tr.scheduleDate })
                         mapTR.set(listEmployeeTR.pin, listEmployeeTR);  // change obj to map 
                     } else if (isNotEmpty(tr.ssn) && isNotEmpty(mapTR.get(tr.ssn))) {
                         let tempMap = mapTR.get(tr.ssn);
-                        tempMap.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity })
+                        tempMap.activity.push({ start: tr.startDt, end: tr.stopDt, activityName: tr.activity, scheduleDate: tr.scheduleDate })
                         mapTR.set(tr.ssn, tempMap);
                     }
                 }//1152
@@ -1777,7 +1945,7 @@ function mapData2Obj(summaryCheck, mapAidToPin) {
                     }
                 }
                 employeeScheList[0].pin = isNotEmpty(mapAidToPin.get(employeeScheList[0].pin)) ? mapAidToPin.get(employeeScheList[0].pin) : employeeScheList = []
-                console.log('employeeScheList:', employeeScheList.length)
+                // console.log('employeeScheList:', employeeScheList.length)
             }
             else {
                 console.log('empty SL detail')
@@ -1820,7 +1988,7 @@ const getMapPinAid = (infoSummaryList) => {
 }
 
 const getSLDetailModel = (rec) => {
-    // return obj.cond.normalOver.overlap.objSL
+    //return obj.cond.normalOT.overlap.objSL
     //return obj.cond.beforeAfterOT.daily.objSL
     //return obj.cond.off.objSL
     //return obj.cond.special.daily.objSL
@@ -1852,7 +2020,7 @@ const getSLDetailModel = (rec) => {
 }
 
 const getTRDetailModel = (rec, overlap) => {
-    // return obj.cond.normalOver.overlap.objTR
+    //return obj.cond.normalOT.overlap.objTR
     //return obj.cond.beforeAfterOT.daily.objTR
     // return obj.cond.off.objTR
     //return obj.cond.special.daily.objTR
@@ -1900,15 +2068,18 @@ const getInfoSummaryCheckModel = () => {
         logger.debug('start getInfoSummaryCheckModel');
     }
     let yesterday = moment('2017-11-12').subtract(1, 'days').format('YYYY-MM-DD');
+    let yesterday2 = moment('2017-11-12').format('YYYY-MM-DD');
     let dayBeforeYesterday = moment().subtract(2, 'days').format('YYYY-MM-DD');
     return infoSummaryCheck.findAll({
-        attributes: ['pin', 'ssn', 'recordDt', 'slFlag', 'trFlag', 'slHeaderId', 'trHeaderId', 'genSumStartDt', 'genSumEndDt'],
+        attributes: ['pin', 'ssn', 'recordDt', 'slFlag', 'trFlag', 'slHeaderId', 'trHeaderId', 'supervisorPin', 'managerPin', 'genSumStartDt', 'genSumEndDt'],
         where: {
             genSumFlag: 'N',
             // recordDt: yesterday,
-            recordDt: {
-                [Op.lte]: yesterday
-            },
+            // recordDt: {
+            //     [Op.lte]: yesterday
+            // },
+            [Op.or]: [{ recordDt: yesterday }, { recordDt: yesterday2 }]
+
         }
         //,limit: 20,
     }).then((todos) => {
@@ -2267,6 +2438,7 @@ Number.prototype.pad = function (size) {
 function resetObjCond() {
     return objbyCond = {
         schedule: {},
+        scheduleOT: {},
         actualClock: {},
         flagPaid: {},
         objHour: {},
@@ -2314,143 +2486,78 @@ function changeFormatBoolean(flag) {
     }
 }
 
+function spiltStringByKeyword(str, key) {
+
+    return str.substr(0, str.indexOf(key)) + str.substr(str.indexOf(key) + 1)
+}
 
 
-// let recordType = (type) => {
-//     if (type == 'ON')
-//         return {
-//             txDetailSLId: '',
-//             txDetailTRId: '',
-//             pin: '',
-//             scheduleStartDt: 'x',
-//             scheduleEndDt: 'x',
-//             otStartDt: '',
-//             otEndDt: '',
-//             actualClockinDt: '0.00',
-//             actualClockoutDt: '0.00',
-//             recordType: 'ON',
-//             shiftFlag: '',
-//             transportFlag: '',
-//             workHour: '',
-//             ot10: '0.00',
-//             ot15: '0.00',
-//             ot30: '0.00',
-//             recordDate: currentDate,
-//             recordMonth: '',
-//             useFlag: 'N',
-//             remark: '',
-//             lateTime: '',
-//             lostTime: '',
-//             createBy: 'Batch',
-//             createDt: '',
-//         }
-//     else if (type == 'OFF')
-//         return {
-//             txDetailSLId: '',
-//             txDetailTRId: '',
-//             pin: '',
-//             scheduleStartDt: '',
-//             scheduleEndDt: '',
-//             otStartDt: '',
-//             otEndDt: '',
-//             actualClockinDt: '',
-//             actualClockoutDt: '',
-//             recordType: 'OFF',
-//             shiftFlag: '',
-//             transportFlag: '',
-//             workHour: '',
-//             ot10: '0.00',
-//             ot15: '0.00',
-//             ot30: '0.00',
-//             recordDate: currentDate,
-//             recordMonth: '',
-//             useFlag: 'N',
-//             remark: '',
-//             lateTime: '',
-//             lostTime: '',
-//             createBy: 'Batch',
-//             createDt: '',
-//         }
-//     else if (type == 'LV')
-//         return {
-//             txDetailSLId: 'x',
-//             txDetailTRId: '',
-//             pin: 'x',
-//             scheduleStartDt: 'x',
-//             scheduleEndDt: 'x',
-//             otStartDt: '',
-//             otEndDt: '',
-//             actualClockinDt: '',
-//             actualClockoutDt: '',
-//             recordType: 'x',
-//             shiftFlag: false,
-//             transportFlag: false,
-//             ot10: '0.00',
-//             ot15: '0.00',
-//             ot30: '0.00',
-//             workHour: '',
-//             recordDate: currentDate,
-//             recordMonth: '',
-//             useFlag: 'N',
-//             remark: 'x',
-//             lateTime: '',
-//             lostTime: '',
-//             createBy: 'Batch',
-//             createDt: '',
-//         }
-//     else if (type == 'AutoOT')
-//         return {
-//             txDetailSLId: '',
-//             txDetailTRId: '',
-//             pin: '',
-//             scheduleStartDt: '',
-//             scheduleEndDt: '',
-//             otStartDt: '',
-//             otEndDt: '',
-//             actualClockinDt: '',
-//             actualClockoutDt: '',
-//             recordType: 'AutoOT',
-//             shiftFlag: '',
-//             transportFlag: '',
-//             ot10: '8.00',
-//             ot15: '0.00',
-//             ot30: '0.00',
-//             workHour: '',
-//             recordDate: currentDate,
-//             recordMonth: '',
-//             useFlag: 'N',
-//             remark: '',
-//             createBy: 'Batch',
-//             lateTime: '',
-//             lostTime: '',
-//             createDt: '',
-//         }
-//     else if (type == '2OT')
-//         return {
-//             txDetailSLId: '',
-//             txDetailTRId: '',
-//             pin: 'x',
-//             scheduleStartDt: '',
-//             scheduleEndDt: '',
-//             otStartDt: 'x',
-//             otEndDt: 'x',
-//             actualClockinDt: '',
-//             actualClockoutDt: '',
-//             recordType: 'x',
-//             shiftFlag: '',
-//             transportFlag: '',
-//             ot10: '0.00',
-//             ot15: '0.00',
-//             ot30: '0.00',
-//             workHour: '',
-//             recordDate: currentDate,
-//             recordMonth: '',
-//             useFlag: 'N',
-//             remark: '',
-//             createBy: 'Batch',
-//             lateTime: '',
-//             lostTime: '',
-//             createDt: '',
-//         }
-// }
+function fullScanMidNight(list, scheduleDate) {
+
+    let midNight = moment(scheduleDate).format('YYYY-MM-DD' + format)
+    let nextDay = moment(scheduleDate).add(1, 'days').format('YYYY-MM-DD ' + format)
+
+    list.some(e => {
+        // let scheDuleDateTR = moment(e.scheduleDate).format('YYYY-MM-DD')
+        let timeRecord = moment(e.scheduleDate + ' ' + e.end).format('YYYY-MM-DD' + format);
+        if (timeRecord == midNight) {
+            e.scheduleDate = nextDay
+            console.log(list)
+            return true
+        }
+
+    })
+    return list
+}
+
+function midNightToNextDay(dt) {
+    let midNight = '00:00:00'
+    let dateTime = moment(dt).format(format)
+    if (midNight == dateTime) {
+        return dt.add(1, 'days')
+    }
+    else {
+        return dt
+    }
+}
+
+async function getOrgCodeByPin(pin, rec) {
+
+    //let obj = await employeeService.getEmployeeDetailWithOrganizeByPin(pin)
+
+
+    // employeeService.getEmployeeDetailWithOrganizeByPin(pin).then(obj => {
+    //     if (isNotEmpty(obj)) {
+    //         rec.cmpy = !isNaN(parseInt(obj.orgCodeCO)) ? obj.orgCodeCO : 'NOT_FOUND'
+    //         rec.bu = !isNaN(parseInt(obj.orgCodeBU)) ? obj.orgCodeBU : 'NOT_FOUND'
+    //         rec.dp = !isNaN(parseInt(obj.orgCodeDP)) ? obj.orgCodeDP : 'NOT_FOUND'
+    //         rec.section = !isNaN(parseInt(obj.orgCodeSC)) ? obj.orgCodeSC : 'NOT_FOUND'
+    //         rec.fn = !isNaN(parseInt(obj.orgCodeFC)) ? obj.orgCodeFC : 'NOT_FOUND'
+    //     }
+    // }).catch(err => {
+    //     rec.cmpy = 'NOT_FOUND'
+    //     rec.bu = 'NOT_FOUND'
+    //     rec.dp = 'NOT_FOUND'
+    //     rec.section = 'NOT_FOUND'
+    //     rec.fn = 'NOT_FOUND'
+    // })
+
+    try {
+        let obj = await employeeService.getEmployeeDetailWithOrganizeByPin(pin);
+        if (isNotEmpty(obj)) {
+            rec.cmpy = !isNaN(parseInt(obj.orgCodeCO)) ? obj.orgCodeCO : 'NOT_FOUND'
+            rec.bu = !isNaN(parseInt(obj.orgCodeBU)) ? obj.orgCodeBU : 'NOT_FOUND'
+            rec.dp = !isNaN(parseInt(obj.orgCodeDP)) ? obj.orgCodeDP : 'NOT_FOUND'
+            rec.section = !isNaN(parseInt(obj.orgCodeSC)) ? obj.orgCodeSC : 'NOT_FOUND'
+            rec.fn = !isNaN(parseInt(obj.orgCodeFC)) ? obj.orgCodeFC : 'NOT_FOUND'
+        }
+    } catch (e) {
+        rec.cmpy = 'NOT_FOUND'
+        rec.bu = 'NOT_FOUND'
+        rec.dp = 'NOT_FOUND'
+        rec.section = 'NOT_FOUND'
+        rec.fn = 'NOT_FOUND'
+    }
+
+}
 
